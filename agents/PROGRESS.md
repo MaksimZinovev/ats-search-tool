@@ -79,3 +79,9 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 - Fail-obvious rule (user req): blocked fetches NEVER collapse to "unclear" — server returns per-url err (HTTP code / timeout / bot-check empty page), UI shows ✕ dashed-red cells + red ⚠ hint naming the failures. Real-net proof: Greenhouse blocked 2/7 (bot check + 404), warning rendered.
 - WTTJ example now: rel 2.6 amber, job 3.6 green, loc 1.0 red (different country), live 0.0 red (expired) — pre-click signal working.
 - Colors approved: cell tints #e6f4ea/#fef7e0/#fce8e6 buckets; muted gray = snippet-only/unclear; 0 loc & 2.x live render muted not red (no-signal ≠ fail).
+
+## Posting-gone detection (user-catched follow-up: "why was live scored 3?")
+- Root cause (investigated empirically): greenhouse redirects REMOVED postings (200, not 404) to job-boards.../<co>?error=true; the "no longer open" banner is CLIENT-RENDERED JS (0 hits in server HTML) → scorer saw a healthy board listing → live 3.0. Same trap had silently produced green live cells for KnowBe4/Testlio/Oodle in round 18.
+- Ground truth = greenhouse public JSON API (boards-api.../v1/boards/<co>/jobs; job LIST endpoint works, unblocked): all 6 Brave "Sydney" greenhouse postings GENUINELY dead (ids absent from live lists; churn is high — Brave serves stale ATS postings for weeks).
+- Built two layers: (1) deterministic id-loss redirect check server-side (posting path segment lost after fetch redirect → gone, live 0, no wasted AI) + (2) third `still` question in verify batch fed original+final URLs ("is the page still the posting, or a board/list/filled page?") → gone also from text signals, loc preserved. Blocked/unverifiable stays ✕, redirect-gone shows loc "–" + live 0.0 red + red hint line.
+- Positive control: live KnowBe4 posting (7476786002) → gone=false, loc 1 (FL vs Sydney, red), live 2.87 amber "probably open" ✓. Dead Oodle/WTTJ → gone/live 0 red ✓. E2E screenshots verified.

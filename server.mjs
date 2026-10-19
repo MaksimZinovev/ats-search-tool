@@ -111,33 +111,48 @@ function pageText(html) {
 
 async function verifyPages(body) {
   const urls = (Array.isArray(body.urls) ? body.urls : []).slice(0, 10); // cap: one expand verifies the top 10
-  const errs = [];
-  const picked = [];
+  const errs = [], pregone = [], picked = [];
   for (let i = 0; i < urls.length; i++) {
-    let err = null, page = "";
+    let err = null, page = "", fin = urls[i], gone = false;
     try {
       const p = await fetch(urls[i], {
         headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36", Accept: "text/html" },
         redirect: "follow", signal: AbortSignal.timeout(10000),
       });
+      fin = p.url || urls[i];
       if (!p.ok) err = `HTTP ${p.status}${p.status === 403 || p.status === 429 ? " — site blocked the fetch" : ""}`;
       else {
-        page = pageText(await p.text());
-        if (page.length < 400) err = "page nearly empty — likely a bot check"; // challenge pages strip to a stub
+        // layer 1, deterministic: a removed posting redirects to a board/list page, losing its
+        // job-id path segment (greenhouse: .../jobs/678… → .../<company>?error=true). The "no
+        // longer open" banner is client-rendered JS, so the URL — not the text — is the signal.
+        const oSeg = new URL(urls[i]).pathname.split("/").filter(Boolean);
+        const fSeg = new URL(fin).pathname.split("/").filter(Boolean);
+        if (!fSeg.includes(oSeg[oSeg.length - 1])) gone = true;
+        else {
+          page = pageText(await p.text());
+          if (page.length < 400) err = "page nearly empty — likely a bot check"; // challenge pages strip to a stub
+        }
       }
     } catch (e) {
       err = /timeout|abort/i.test(String(e.cause?.name || e.message || e)) ? "timed out" : "network error";
     }
-    if (!err) picked.push({ oi: i, page });
-    errs[i] = err;
+    if (err) errs[i] = err;
+    else if (gone) pregone[i] = true;
+    else picked.push({ oi: i, url: urls[i], fin, page });
     if (i < urls.length - 1) await new Promise((s) => setTimeout(s, 350)); // 1qps pacing between sites
   }
   const scores = [];
-  for (let i = 0; i < urls.length; i++) scores.push({ i, ok: false, err: errs[i], loc: null, live: null });
+  for (let i = 0; i < urls.length; i++) scores.push({ i, ok: false, gone: false, err: errs[i], loc: null, live: null });
+  pregone.forEach((_, i) => { scores[i] = { i, ok: true, gone: true, err: null, loc: null, live: 0 }; });
   if (picked.length) {
-    const state = { keywords: body.keywords || "", location: body.location || "", query: "verified posting pages", results: picked.map((p) => ({ i: p.oi, page: p.page })) };
+    const state = { keywords: body.keywords || "", location: body.location || "", query: "verified posting pages", results: picked.map((p) => ({ i: p.oi, url: p.url, final: p.fin, page: p.page })) };
     const questions = {};
     picked.forEach((p, idx) => {
+      questions[`still${idx}`] = {
+        type: "score",
+        instructions: `The posting originally lived at \`results[${idx}].url\`; the fetch followed redirects and the page actually served is \`results[${idx}].final\`, whose text is \`results[${idx}].page\`. Is \`results[${idx}].page\` still an individual job posting page for that URL — its own title, description, apply option? If it instead shows a general board/list of jobs, a landing page, or a "role filled / no longer open" message, the posting is gone.`,
+        criteria: JOB_LEVELS,
+      };
       questions[`loc${idx}`] = {
         type: "score",
         instructions: `Based ONLY on this job posting page text \`results[${idx}].page\`, where is the position located relative to the requested location \`${state.location}\`?`,
@@ -145,7 +160,7 @@ async function verifyPages(body) {
       };
       questions[`live${idx}`] = {
         type: "score",
-        instructions: `Based ONLY on this job posting page text \`results[${idx}].page\`, is this posting still open and accepting applications? Look for banners like "no longer available", "expired", "closed for applications", and past closing dates.`,
+        instructions: `Is the posting at \`results[${idx}].url\` still open and accepting applications, judging by the fetched page \`results[${idx}].page\`? If the served page (\`results[${idx}].final\`) is a general board/list/landing page rather than the posting itself, the posting is gone — score 0. Look for banners like "no longer available", "expired", "closed for applications", and past closing dates.`,
         criteria: LIVE_LEVELS,
       };
     });
@@ -156,7 +171,9 @@ async function verifyPages(body) {
     if (!r.ok) throw new Error(`typesafe ${r.status}: ${(await r.text()).slice(0, 200)}`);
     const j = await r.json();
     picked.forEach((p, idx) => {
-      scores[p.oi] = { i: p.oi, ok: true, err: null, loc: j.answers?.[`loc${idx}`]?.score ?? null, live: j.answers?.[`live${idx}`]?.score ?? null };
+      const still = j.answers?.[`still${idx}`]?.score ?? null;
+      const gone = still != null && still < 2; // layer 2: page no longer shows the posting → dead
+      scores[p.oi] = { i: p.oi, ok: true, gone, err: null, loc: j.answers?.[`loc${idx}`]?.score ?? null, live: gone ? 0 : j.answers?.[`live${idx}`]?.score ?? null };
     });
   }
   return scores;

@@ -217,7 +217,10 @@ async function verifyRow(r) {
     for (const s of res.scores || []) {
       const m = r.matches.find((x) => x.url === urls[s.i]);
       if (!m) continue;
-      if (s.ok) { m.loc = s.loc; m.live = s.live; m.v = true; m.verr = null; }
+      if (s.ok) {
+        if (s.gone) m.gone = true; // posting removed: redirects to a board page or says "no longer open"
+        m.loc = s.loc; m.live = s.live; m.v = true; m.verr = null;
+      }
       else m.verr = s.err; // blocked/timeout/404 — shown as ✕, never silently "unclear"
     }
   } catch (e) { /* snippet scores remain */ }
@@ -261,7 +264,7 @@ function rowVal(r) { // sort value; null = keep original position
 const REL_TIP = "rel — how well the posting matches your KEYWORDS (location is scored separately as loc). 0 unrelated · 1 different role · 2 partially relevant · 3 relevant · 4 strong match";
 const JOB_TIP = "job — is it an individual job posting for an open role (not a blog or category page)? 0 clearly not · 1 probably not · 2 unclear · 3 probably real · 4 definitely real";
 const LOC_TIP = "loc — posted work location vs your search location. Muted = judged from the search snippet only (weak evidence); expanding the row re-scores it from the posting page itself. 0 unknown · 1 different country · 2 same country elsewhere · 3 same region/remote · 4 matches. ✕ = page fetch was blocked.";
-const LIVE_TIP = "live — is the posting still open and accepting applications? Muted = snippet-only evidence; expanding re-scores it from the posting page. 0 expired/no longer available · 1 stale · 2 unclear · 3 looks open · 4 explicitly open (future closing date). ✕ = page fetch was blocked.";
+const LIVE_TIP = "live — is the posting still open and accepting applications? Muted = snippet-only evidence; expanding re-scores it from the posting page. 0 expired/no longer available · 1 stale · 2 unclear · 3 looks open · 4 explicitly open (future closing date). 0 is also forced when the posting page is gone (redirects to a board list or states the role is no longer open). ✕ = page fetch was blocked.";
 const scoreCls = (v) => (v >= 3 ? "sc-hi" : v >= 2 ? "sc-mid" : "sc-lo");
 const locCls = (v) => (v === 0 ? "sc-un" : scoreCls(v)); // 0 = "unknown" → muted, not alarm-red
 const liveCls = (v) => (v >= 1.5 && v < 2.5 ? "sc-un" : scoreCls(v)); // ≈2 "unclear" → muted, real signals get colour
@@ -279,6 +282,8 @@ function matchBody(r) {
   const notes = [];
   if (r.vbusy) notes.push(`<div class="hint vbusy">fetching posting pages — verifying loc/live …</div>`);
   else {
+    const goneN = r.matches?.filter((m) => m.gone).length || 0;
+    if (goneN) notes.push(`<div class="hint warn">⚠ ${goneN} of ${n} postings no longer exist — the page redirects to a board/list page or states the role is no longer open (live forced to 0)</div>`);
     const bad = r.matches?.filter((m) => m.verr) || [];
     if (bad.length) notes.push(`<div class="hint warn">⚠ ${bad.length} of ${n} posting pages could not be fetched (${[...new Set(bad.map((m) => m.verr))].join(", ")}) — those show ✕ and stay snippet-scored</div>`);
     else if (r.matches?.some((m) => !m.v)) notes.push(`<div class="hint">loc/live are snippet-scored above — expanding this row re-scores them from the actual posting pages${n > 10 ? " (top 10)" : ""}</div>`);
