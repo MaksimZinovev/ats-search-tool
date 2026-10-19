@@ -93,3 +93,10 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 - Verify-ability map (PROG): gov boards (QLD smartjobs viewFullSingle, WA search.jobs.wa, NT JobDetails — server-rendered, loc/live scored ✓); iworkfor.nsw = Cloudflare 403, UniMelb = refuses non-browser TLS (curl 000 + node network error), LiveHire = WAF 403, UNSW = timeouts — those rows show ✕ + reason, never fake scores; counts still work.
 - PLAT_KEY bumped v1→v2 (auto-migration to 29 built-ins; v1 prefs dropped). Custom platforms get region "".
 - E2E: 29 rows, 11 chips, gov/uni rows honestly 0 for "software tester" (dimmed); LiveHire expanded → 2 real postings (snippet-scored) + 403-✕ verify states. Screenshot verified.
+
+## Ollama design system applied (impeccable skill)
+- User directive: apply /Users/maksim/repos/open-design/design-systems/ollama/DESIGN.md. Impeccable init gate cleared: PRODUCT.md (register: product) + root DESIGN.md written.
+- Chrome fully monochrome: white/snow surfaces, 1px #e5e5e5 borders, zero shadows/gradients, SF Pro Rounded h1 (500/24px), binary radius (12px containers / 9999px pills: buttons, inputs, sort tabs, region chips, score cells, history items), weights ≤500, blue focus-visible ring only, flat white bordered tooltips.
+- ONE documented chromatic exception: score-cell tints (green/amber/red) + ✕-blocked + warn/err text — they encode the graded signal the tool exists to show (user-approved feature; strict-grayscale variant offered but not requested).
+- Browser-verified (screenshots + computed styles): zero shadows on panels/summary/CTA, ink posting links, counts #525252-on-snow (≈7.5:1), hint stone (≈4.7:1), score pill radius 9999px, tooltip content/bg/border/visible at hover. Reduced-motion guard added (pulse + tooltip fade).
+- Impeccable skill updated 3.5.0 → 4.6.0 (user-level; applies next session).
