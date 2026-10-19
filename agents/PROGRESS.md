@@ -119,3 +119,9 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 - One bold move, product register (per bolder.md: clarity over drama, monochrome-safe): header inverted to full-bleed black band (--ink bg), h1 700 48px white (.03 tighter tracking), lead 14px #e5e5e5, site: chip on --ink2, #platCount white w500, #banner amber lightened to #f6c177 for black-band contrast (13:1+ everywhere).
 - Scale jump 48/14 = 3.4x (bolder.md wants 3-5x); detector CLEAN ({11,14,48}); rest of page byte-untouched (panels/results/footer identical).
 - Verified: screenshot header-bold.png (black band, 192px, panels crisp below); DESIGN.md h1/header spec updated to match; commit pending.
+
+## Platforms panel blank names — root cause and fix
+- Symptom (user screenshot): AU-state platforms rendered as blank pill circles in the editor; LiveHire/EH/EthicalJobs showed truncated text.
+- NOT missing data: /api/platforms and localStorage all had correct names. Layout bug: .plat grid col2 (minmax(70px,0.8fr)) + name input flex:1 min-width:0 let the wide "AU · <STATE>" region chips (65px) crush the name input to 22px = padding-only blank circle; "AU" chips (32px) left 41px so those 3 rows showed text. Earlier "stale LS cache" theory was wrong (my browser LS had 0 blank names; measurements proved squeeze).
+- Fix: editor chips shortened to state code (region.split("·").pop() → "QLD"/"NSW"; full region still in results + hover title); grid rebalanced auto minmax(90px,1.2fr) minmax(120px,1fr) auto; name input min-width 48px; name/domain inputs get title = full value (hover reveals truncated text).
+- Verified: UNSW name 63px (was 22), chip 42px (was 65); screenshot plat-fix-au.png all 11 AU rows legible. Also added init healing earlier in this fix cycle: server list now always overwrites built-in names/regions in LS cache (customs + hidden flags preserved) — kept as protection against future stale caches.

@@ -94,7 +94,7 @@
     opacity: 0; visibility: hidden; transition: opacity 0.15s; z-index: 10; pointer-events: none;
   }
   [data-tip]:hover::after { opacity: 1; visibility: visible; }
-  .plat { display: grid; grid-template-columns: auto minmax(70px, 0.8fr) minmax(140px, 1.4fr) auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .plat { display: grid; grid-template-columns: auto minmax(90px, 1.2fr) minmax(120px, 1fr) auto; gap: 6px; margin-bottom: 6px; align-items: center; }
   .plat input { padding: 5px 10px; font-size: 11px; min-width: 0; }
   .plat button, #platAdd button { padding: 4px 10px; }
   #platAdd { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-top: 10px; }
@@ -362,8 +362,8 @@ function renderPlatforms() {
   $("#platList").innerHTML = state.platforms.map((p, i) => `
     <div class="plat">
       <input type="checkbox" data-pi="${i}" data-f="hidden" ${p.hidden ? "" : "checked"} title="visible in search">
-      <span style="display:flex;gap:6px;align-items:center;min-width:0"><input type="text" data-pi="${i}" data-f="name" value="${esc(p.name)}" title="name" style="flex:1;min-width:0">${p.region ? `<span class="region">${esc(p.region)}</span>` : ""}</span>
-      <input type="text" data-pi="${i}" data-f="domain" value="${esc(p.domain)}" title="domain">
+      <span style="display:flex;gap:6px;align-items:center;min-width:0"><input type="text" data-pi="${i}" data-f="name" value="${esc(p.name)}" title="${esc(p.name)}" style="flex:1;min-width:48px">${p.region ? `<span class="region" title="${esc(p.region)}">${esc(p.region.includes("·") ? p.region.split("·").pop().trim() : p.region)}</span>` : ""}</span>
+      <input type="text" data-pi="${i}" data-f="domain" value="${esc(p.domain)}" title="${esc(p.domain)}">
       <button data-pi="${i}" data-f="del" title="remove">✕</button>
     </div>`).join("");
   $("#platSum").textContent = `Platforms (${state.platforms.filter((p) => !p.hidden).length}/${state.platforms.length} visible)`;
@@ -444,7 +444,18 @@ $("#histClear").addEventListener("click", () => { lsSet(HIST_KEY, []); renderHis
 // ---- init ----
 (async () => {
   state.cfg = await fetch("/api/config").then((r) => r.json());
-  state.platforms = lsGet(PLAT_KEY, null) || await fetch("/api/platforms").then((r) => r.json());
+  const serverPlats = await fetch("/api/platforms").then((r) => r.json());
+  const savedPlats = lsGet(PLAT_KEY, null);
+  if (Array.isArray(savedPlats) && savedPlats.length) {
+    // server is truth for built-ins (heals stale or blank cached names); customs and visible toggles survive
+    state.platforms = serverPlats.map((sp) => {
+      const o = savedPlats.find((p) => p.domain === sp.domain);
+      return o ? { ...sp, hidden: o.hidden } : sp;
+    });
+    for (const c of savedPlats) if (!serverPlats.some((p) => p.domain === c.domain)) state.platforms.push(c);
+  } else {
+    state.platforms = serverPlats;
+  }
   savePlatforms();
   $("#platCount").textContent = state.platforms.length;
   renderBanner(); renderPlatforms(); renderHistory();
