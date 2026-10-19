@@ -1,4 +1,4 @@
-// lib.mjs — shared logic: platforms, query building, parsers, API fetchers.
+// lib.mjs — shared logic: platforms, query building, Brave search (paged).
 // Self-check (no network): node lib.mjs
 import assert from "node:assert/strict";
 
@@ -38,19 +38,8 @@ export function buildQuery(domain, keywords, location, orMode) {
 export const braveUrl = (q) => `https://search.brave.com/search?q=${encodeURIComponent(q)}`;
 export const googleUrl = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
 
-// Bing total estimate, e.g. '<span class="sb_count">65 results</span>'.
-// ponytail: single regex; if Bing changes markup this returns null → UI shows "20+".
-export function parseBingTotal(html) {
-  const m = html.match(/class="sb_count"[^>]*>([^<]+)</);
-  if (!m) return null;
-  const n = m[1].match(/[\d.,]+/);
-  if (!n) return null;
-  const v = parseInt(n[0].replace(/[.,\s]/g, ""), 10);
-  return Number.isFinite(v) ? v : null;
-}
-
-export async function braveCount(query, key) {
-  const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=20`;
+async function bravePage(query, key, offset) {
+  const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=20&offset=${offset}`;
   // ponytail: one 429 retry with 1.2s backoff; real queue if heavy use ever needs it
   for (let attempt = 0; ; attempt++) {
     const r = await fetch(url, { headers: { "X-Subscription-Token": key, Accept: "application/json" } });
@@ -65,23 +54,23 @@ export async function braveCount(query, key) {
       url: x.url || "",
       description: x.description || "",
     }));
-    return { count: results.length, more: !!j.query?.more_results_available, results };
+    return { results, more: !!j.query?.more_results_available };
   }
 }
 
-const UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36";
-
-export async function bingTotal(query) {
-  try {
-    const r = await fetch(`https://www.bing.com/search?q=${encodeURIComponent(query)}`, {
-      headers: { "User-Agent": UA, "Accept-Language": "en-US,en;q=0.9" },
-    });
-    if (!r.ok) return null;
-    return parseBingTotal(await r.text());
-  } catch {
-    return null; // ponytail: Bing total is best-effort; "20+" is the fallback display
+// Paged Brave search: exact count up to MAX_PAGES*20, then "capped"=true → UI shows "60+".
+// ponytail: Bing-HTML totals proved garbage server-side (site: ignored, 65→6570 across runs,
+// unrelated results), so paging Brave — the API we already trust — replaces the hybrid plan.
+export async function braveSearch(query, key, MAX_PAGES = 3) {
+  const all = [];
+  let more = true;
+  for (let offset = 0; offset < MAX_PAGES && more; offset++) {
+    const page = await bravePage(query, key, offset);
+    all.push(...page.results);
+    more = page.more && page.results.length === 20;
+    if (offset < MAX_PAGES - 1 && more) await new Promise((s) => setTimeout(s, 350)); // free tier ≈1qps
   }
+  return { count: all.length, capped: more, results: all };
 }
 
 // ---- self-check: node lib.mjs (pure functions only, no network) ----
@@ -92,9 +81,6 @@ if (process.argv[1]?.endsWith("lib.mjs")) {
     'site:jobs.lever.co "qa" OR "software tester"');
   assert.equal(buildQuery("x.com", 'weird "quotes"', "  ", false), 'site:x.com "weird quotes"');
   assert.equal(buildQuery("x.com", "engineer", "Sydney", true), 'site:x.com "engineer" Sydney');
-  assert.equal(parseBingTotal('<span class="sb_count">65 results</span>'), 65);
-  assert.equal(parseBingTotal('<span class="sb_count">About 1,234 results</span>'), 1234);
-  assert.equal(parseBingTotal('<div class="x">no results</div>'), null);
-  assert.equal(braveUrl('a b').endsWith(encodeURIComponent('a b')), true);
+  assert.ok(braveUrl("a b").endsWith(encodeURIComponent("a b")));
   console.log("lib self-check OK");
 }
