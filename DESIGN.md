@@ -26,8 +26,8 @@ Pure-white workspace, flat paper feel: depth from 1px borders and background shi
 
 ## Typography
 
-- Headings: `SF Pro Rounded` weight 700, h1 30px/1.05 `-.02em` (user-directed "bolder title"; the sole weight >500 in the system, and every other heading stays ≤500); panel titles 12px uppercase Stone.
-- Header copy: three lines (`.lead` 15px ink, `.how` 13px mid, `.trust` 12px stone), each capped at 68ch; inline code (`site:`) = mono in a gray pill chip.
+- Headings: `SF Pro Rounded` weight 700, h1 48px/1.02 `-.03em` (user-directed: bolder title, then `/impeccable bolder` masthead; the sole weight >500 in the system, and every other heading stays ≤500); panel titles 11px uppercase Stone.
+- Header copy: masthead inverted to a full-bleed black band (`--ink` bg; the system's own ink as dominant color): h1 white (`--bg`/`#fff`), `.lead` 14px `#e5e5e5` single prose capped at 68ch with `text-wrap: pretty`, inline code (`site:`) = mono in an `--ink2` pill chip, `#platCount` white weight 500, `#banner` `#f6c177` (lightened amber for contrast on black). Page below the band unchanged (white).
 - Body/UI: `ui-sans-serif` 13–14px/1.5; weights ≤500 only (no bold).
 - Data: `ui-monospace` (counts, scores, timestamps).
 

@@ -114,3 +114,8 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 - Type scale consolidated page-wide: {11, 14, 32} (nearest ratio 1.27 ≥ 1.25) — detector now CLEAN (exit 0); off-scale text-bearing elements: none.
 - Measurements: header 149px (was 259), Search btn y=355 (was 469), all text on-scale.
 - Backlog (persisted, not in scope): cancellable search (P2), shareable URL state (P2), static score legend (P3).
+
+## /impeccable bolder — masthead (user-scoped: top section only)
+- One bold move, product register (per bolder.md: clarity over drama, monochrome-safe): header inverted to full-bleed black band (--ink bg), h1 700 48px white (.03 tighter tracking), lead 14px #e5e5e5, site: chip on --ink2, #platCount white w500, #banner amber lightened to #f6c177 for black-band contrast (13:1+ everywhere).
+- Scale jump 48/14 = 3.4x (bolder.md wants 3-5x); detector CLEAN ({11,14,48}); rest of page byte-untouched (panels/results/footer identical).
+- Verified: screenshot header-bold.png (black band, 192px, panels crisp below); DESIGN.md h1/header spec updated to match; commit pending.

@@ -16,11 +16,12 @@
     --font-round: "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   body { margin: 0; font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink2); }
-  header { padding: 24px 24px 14px; }
-  h1 { margin: 0; font: 700 32px/1.05 var(--font-round); letter-spacing: -.02em; color: var(--ink); }
-  header .lead { margin: 8px 0 0; max-width: 68ch; font-size: 14px; color: var(--ink2); text-wrap: pretty; }
-  header .lead code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; background: var(--line); border-radius: 9999px; padding: 1px 7px; }
-  #banner { margin: 6px 0 0; color: var(--warn); font-size: 14px; }
+  header { background: var(--ink); padding: 36px 24px 28px; }
+  h1 { margin: 0; font: 700 48px/1.02 var(--font-round); letter-spacing: -.03em; color: var(--bg); }
+  header .lead { margin: 10px 0 0; max-width: 68ch; font-size: 14px; color: var(--line); text-wrap: pretty; }
+  header .lead code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; background: var(--ink2); color: var(--line); border-radius: 9999px; padding: 1px 7px; }
+  #platCount { color: var(--bg); font-weight: 500; }
+  #banner { margin: 6px 0 0; color: #f6c177; font-size: 14px; }
   main { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 14px 24px 40px; }
   aside { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
   .panel, details { background: var(--snow); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
