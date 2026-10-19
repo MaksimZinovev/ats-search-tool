@@ -17,6 +17,8 @@
 # created = "2026-10-19"
 # source = "hand: Python twin of lib.mjs braveSearch (v0 blocks are Python)"
 #
+# [stamp]
+# state = "quarantined"
 # ///
 import argparse, json, os, sys, time
 import urllib.error, urllib.parse, urllib.request

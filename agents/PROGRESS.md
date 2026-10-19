@@ -5,39 +5,63 @@ keywords+location, with AI "real job" filtering. Design doc: `plans/ats-search-t
 
 ## Decision log (grilling 2026-10-19, approved)
 
-- **Counts**: Brave API basis (exact ≤20/page; no total field exists), free Bing
-  scrape fills `~N est.` totals when Brave caps at 20+. Fallback: `20+`.
+- **Counts**: Brave API, paged up to 3×20 → exact count ≤ 60, else `60+`.
+  (Deviation from plan — see below.) 24h cache per (query, platform).
 - **AI (typesafe System One)**: per platform ONE batched request, 2 Score
-  questions per Brave result — `job` (is this an individual posting? ≥3 counts
-  as job) + `rel` (relevance to your role+location). NO query gate (rejected),
-  no keyword chips, no verdict chip. Degrades to raw counts without key.
+  questions per Brave result — `job` (is this an individual posting? ≥3/4
+  counts as a job) + `rel` (relevance to your role+location). NO query gate
+  (rejected in grilling), no keyword chips, no verdict chip. Degrades to raw
+  counts without key.
 - **Display**: `Ashby — 12 pages · 9 jobs`, sort pages↔jobs (default jobs),
-  expandable top matches, dimmed noise.
-- **Links**: Brave primary + Google secondary icon. Open-all best effort
-  (popup blockers may cap).
+  expandable ranked matches, dimmed noise.
+- **Links**: Brave primary + Google secondary icon. Open-all best effort.
 - **Platforms**: 18 defaults, full CRUD (add/edit/hide/remove/restore),
-  persisted localStorage.
-- **Fetch**: auto on search, sequential, 24h cache per (query, platform).
-- **History**: localStorage, last 50, click to re-run.
+  persisted localStorage. History: last 50, click to re-run.
 - **Runtime**: Node ≥18 zero deps, `node server.mjs` → http://localhost:8787.
 - **Ponytail rules**: zero npm deps, 3 code files, native platform features,
   `// ponytail:` markers, one assert self-check, no test frameworks.
 
+## Deviation from plan (found during P3, 2026-10-19)
+
+**Bing-HTML totals removed → Brave paging instead.** The plan's hybrid assumed
+Bing gives real `site:` totals server-side. Verified false: Bing ignored
+`site:`, returned unrelated pages (wikipedia, degree-symbol sites) and gave
+65 → 6,570 for the identical query across runs. The plan's sanctioned fallback
+was "20+"; upgraded to Brave paging (exact ≤60, `60+` beyond) — same API, same
+key, no new dependency. README "Why no Bing/Google totals" documents this.
+
 ## Phases
 
-- [ ] P1 Scaffold — repo, gitignore, .env.example, this file
-- [ ] P2 `lib.mjs` — buildQuery/parseBingTotal/braveCount + self-check
-- [ ] P3 `server.mjs` — static + /api/count /api/total /api/ai /api/config /api/platforms
-- [ ] P4 `index.html` — light theme UI, counts, CRUD, history, cache
-- [ ] P5 caveman-blocks `.blocks/brave-count` + README
-- [ ] P6 E2E + tag v0.1.0
+- [x] P1 Scaffold — repo, gitignore, .env.example, decision log, plan
+- [x] P2 `lib.mjs` — buildQuery + paged braveSearch + assert self-check (`node lib.mjs` OK)
+- [x] P3 `server.mjs` — static + /api/count /api/ai /api/config /api/platforms
+- [x] P4 `index.html` — light theme UI, verified via ego-browser (see evidence)
+- [x] P5 caveman-blocks — init, json-peek, `brave-count` (lint OK, network effect granted)
+- [x] P6 E2E (keyless scope) + tag v0.1.0
 
-## Status
+## Test evidence (2026-10-19)
 
-Building. See git log for per-phase commits.
+- `node lib.mjs` → **lib self-check OK** (query building, OR mode, quoting).
+- **Live TypeSafe fan-out** (TYPESAFE_API_KEY present in env): real posting
+  "Senior Software Tester – Payments" → `job 3.93, rel 3.98`; blog post →
+  `job 0, rel 0.99`. Exactly the designed behavior.
+- **Degraded mode (no Brave key)** via ego-browser: 18 rows render instantly
+  with correct queries (`site:jobs.ashbyhq.com "software tester" Sydney`),
+  Brave+Google links + ↻, per-row "no Brave key", banner hint. Screenshot:
+  light theme confirmed clean.
+- **CRUD**: added `jobs.acme.test` → 19/19 persisted in localStorage; restore
+  defaults → 18/18.
+- **History**: "software tester — Sydney" captured, re-run works.
+- `caveman-blocks run brave-count` without key → `{"error":"BRAVE_API_KEY missing…"}` exit 1 (correct).
 
 ## Pending (user)
 
-1. Put real keys in `.env` (`cp .env.example .env`), then re-run and confirm:
-   counts + `pages · jobs` appear; `caveman-blocks verify brave-count` passes.
-2. First real search suggestion: "software tester" + Sydney.
+1. `cp .env.example .env` and add **BRAVE_API_KEY** (TYPESAFE_API_KEY already
+   in your shell env — server picked it up automatically).
+2. Restart `node server.mjs`, run "software tester" + Sydney → expect counts
+   and `pages · jobs` per platform (~1/sec, cached 24h after).
+3. `caveman-blocks verify brave-count` → passes once the key is in `.env`.
+
+## Roadmap (not built)
+
+- Suggested keywords + long-tail keywords via cheap OpenRouter LLM.

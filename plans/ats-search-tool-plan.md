@@ -1,6 +1,6 @@
 # ATS Search Tool — Build Plan
 
-**Status:** design approved via grilling (3 rounds), 2026-10-19 · awaiting build approval
+**Status:** design approved via grilling (3 rounds), 2026-10-19 · **built v0.1.0 same day** — build log + one deviation (Bing totals → Brave paging, verified unusable) in `agents/PROGRESS.md`
 **Target:** `~/repos/ats-search-tool` (new standalone repo)
 **Living progress doc:** `agents/PROGRESS.md` inside the repo (once created)
 
