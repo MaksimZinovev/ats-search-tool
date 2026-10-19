@@ -5,7 +5,7 @@ promote = "commit"
 
 # Effects blocks may use beyond read, write-workspace and exec: "network", "external".
 # caveman-blocks run reads this from the committed file at HEAD; an uncommitted edit grants nothing.
-allow_effects = []
+allow_effects = ["network"]
 
 # Most blocks listed in the index.
 index_max = 20
