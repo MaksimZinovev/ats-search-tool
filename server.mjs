@@ -28,11 +28,25 @@ const JOB_LEVELS = [
   "Clearly an individual job posting for a currently open role",
 ];
 const REL_LEVELS = [
-  "Unrelated to the searched role or location",
+  "Unrelated to the searched role",
   "Same broad field but a different role",
   "Partially relevant to the searched role",
-  "Relevant match for the searched role and location",
-  "Strong direct match for the searched role and location",
+  "Relevant match for the searched role",
+  "Strong direct match for the searched role",
+];
+const LOC_LEVELS = [
+  "Cannot determine the work location from the provided text",
+  "Located in a different country than the requested location",
+  "Same country as the requested location but a different city",
+  "Same broader region as the requested location, or remote within the same country",
+  "In or around the requested location",
+];
+const LIVE_LEVELS = [
+  "Text shows or strongly implies the posting is expired, closed, or no longer accepting applications",
+  "Strong signs of staleness: past closing date, role already filled",
+  "No freshness information: unclear whether the posting is still open",
+  "Looks currently open: no negative signals",
+  "Confidently open: explicit future closing date or accepting-applications wording",
 ];
 
 // One batched System One request per platform: 2 Score questions per result.
@@ -53,8 +67,18 @@ async function typesafeScores(body) {
     };
     questions[`rel${i}`] = {
       type: "score",
-      instructions: `How relevant is \`results[${i}]\` to a job seeker searching for \`${state.keywords}\`${state.location ? ` in \`${state.location}\`` : ""}? Judge by its title \`results[${i}].title\` and snippet \`results[${i}].description\`.`,
+      instructions: `How relevant is \`results[${i}]\` to a job seeker searching for \`${state.keywords}\`? (Location fit is scored by a separate question.) Judge by its title \`results[${i}].title\` and snippet \`results[${i}].description\`.`,
       criteria: REL_LEVELS,
+    };
+    questions[`loc${i}`] = {
+      type: "score",
+      instructions: `Where is \`results[${i}]\` located relative to the requested location \`${state.location}\`? Judge ONLY by location text in \`results[${i}].title\` and \`results[${i}].description\`.`,
+      criteria: LOC_LEVELS,
+    };
+    questions[`live${i}`] = {
+      type: "score",
+      instructions: `Is \`results[${i}]\` likely still an open, accepting-applications posting? Judge ONLY by freshness signals in \`results[${i}].title\` and \`results[${i}].description\`.`,
+      criteria: LIVE_LEVELS,
     };
   });
   const r = await fetch("https://api.typesafe.ai/v1/systemone", {
@@ -68,7 +92,74 @@ async function typesafeScores(body) {
     i,
     job: j.answers?.[`job${i}`]?.score ?? null,
     rel: j.answers?.[`rel${i}`]?.score ?? null,
+    loc: j.answers?.[`loc${i}`]?.score ?? null,
+    live: j.answers?.[`live${i}`]?.score ?? null,
   }));
+}
+
+// ---- verify pass: fetch posting pages, re-score loc+live from real page content ----
+// ponytail: crude tag-strip instead of a DOM parser; the model reads flattened text fine.
+function pageText(html) {
+  return html
+    .replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&").replace(/&#x27;/g, "'").replace(/&quot;/g, "\"")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ").trim().slice(0, 12000);
+}
+
+async function verifyPages(body) {
+  const urls = (Array.isArray(body.urls) ? body.urls : []).slice(0, 10); // cap: one expand verifies the top 10
+  const errs = [];
+  const picked = [];
+  for (let i = 0; i < urls.length; i++) {
+    let err = null, page = "";
+    try {
+      const p = await fetch(urls[i], {
+        headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36", Accept: "text/html" },
+        redirect: "follow", signal: AbortSignal.timeout(10000),
+      });
+      if (!p.ok) err = `HTTP ${p.status}${p.status === 403 || p.status === 429 ? " — site blocked the fetch" : ""}`;
+      else {
+        page = pageText(await p.text());
+        if (page.length < 400) err = "page nearly empty — likely a bot check"; // challenge pages strip to a stub
+      }
+    } catch (e) {
+      err = /timeout|abort/i.test(String(e.cause?.name || e.message || e)) ? "timed out" : "network error";
+    }
+    if (!err) picked.push({ oi: i, page });
+    errs[i] = err;
+    if (i < urls.length - 1) await new Promise((s) => setTimeout(s, 350)); // 1qps pacing between sites
+  }
+  const scores = [];
+  for (let i = 0; i < urls.length; i++) scores.push({ i, ok: false, err: errs[i], loc: null, live: null });
+  if (picked.length) {
+    const state = { keywords: body.keywords || "", location: body.location || "", query: "verified posting pages", results: picked.map((p) => ({ i: p.oi, page: p.page })) };
+    const questions = {};
+    picked.forEach((p, idx) => {
+      questions[`loc${idx}`] = {
+        type: "score",
+        instructions: `Based ONLY on this job posting page text \`results[${idx}].page\`, where is the position located relative to the requested location \`${state.location}\`?`,
+        criteria: LOC_LEVELS,
+      };
+      questions[`live${idx}`] = {
+        type: "score",
+        instructions: `Based ONLY on this job posting page text \`results[${idx}].page\`, is this posting still open and accepting applications? Look for banners like "no longer available", "expired", "closed for applications", and past closing dates.`,
+        criteria: LIVE_LEVELS,
+      };
+    });
+    const r = await fetch("https://api.typesafe.ai/v1/systemone", {
+      method: "POST", headers: { Authorization: `Bearer ${TYPESAFE}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ state, model: "jev-latest", questions }),
+    });
+    if (!r.ok) throw new Error(`typesafe ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    const j = await r.json();
+    picked.forEach((p, idx) => {
+      scores[p.oi] = { i: p.oi, ok: true, err: null, loc: j.answers?.[`loc${idx}`]?.score ?? null, live: j.answers?.[`live${idx}`]?.score ?? null };
+    });
+  }
+  return scores;
 }
 
 const server = createServer(async (req, res) => {
@@ -104,6 +195,19 @@ const server = createServer(async (req, res) => {
       const body = JSON.parse(Buffer.concat(chunks).toString());
       if (!Array.isArray(body?.results) || !body.results.length) return send(200, { scores: [] });
       return send(200, { scores: await typesafeScores(body) });
+    }
+    if (req.method === "POST" && u.pathname === "/api/verify") {
+      if (!TYPESAFE) return send(200, { disabled: true });
+      const chunks = [];
+      let n = 0;
+      for await (const c of req) {
+        n += c.length;
+        if (n > 1e6) throw new Error("body too large");
+        chunks.push(c);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString());
+      if (!Array.isArray(body?.urls) || !body.urls.length) return send(200, { scores: [] });
+      return send(200, { scores: await verifyPages(body) });
     }
     send(404, { error: "not found" });
   } catch (e) {

@@ -72,3 +72,10 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 ## Roadmap (not built)
 
 - Suggested keywords + long-tail keywords via cheap OpenRouter LLM.
+## Verified-loc/live pass (v0.2 direction)
+- Tested empirically BEFORE building (user: "test it before building"): Brave snippets carry no/explicit-sparse location+expiry text (WTTJ snippet = skills line; all 7 Greenhouse snippets = role text). Snippet-only loc would be honest-but-gray everywhere.
+- Page-fetch verification validated on the real example: WTTJ aL6CdMig page contains "Remote from Spain" + "Job no longer available" banner → both signals live on page. Greenhouse pages carry location text.
+- Built: 4-question snippet scoring (rel redefined keywords-only; loc/live questions) + /api/verify (server GETs pages, tag-strip, one batched systemone loc/live re-score, cap 10, 1qps) + expand-triggered verifyRow (native details toggle, capture listener).
+- Fail-obvious rule (user req): blocked fetches NEVER collapse to "unclear" — server returns per-url err (HTTP code / timeout / bot-check empty page), UI shows ✕ dashed-red cells + red ⚠ hint naming the failures. Real-net proof: Greenhouse blocked 2/7 (bot check + 404), warning rendered.
+- WTTJ example now: rel 2.6 amber, job 3.6 green, loc 1.0 red (different country), live 0.0 red (expired) — pre-click signal working.
+- Colors approved: cell tints #e6f4ea/#fef7e0/#fce8e6 buckets; muted gray = snippet-only/unclear; 0 loc & 2.x live render muted not red (no-signal ≠ fail).

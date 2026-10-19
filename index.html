@@ -56,6 +56,14 @@
   .matches-table th.num, .matches-table td.num { text-align: right; width: 52px; font-family: ui-monospace, Menlo, monospace; }
   .matches-table th[data-tip] { margin-left: 0; text-decoration: underline dotted #c3c8cf; text-underline-offset: 3px; }
   .matches-table tr.dim { color: #8a919c; }
+  .matches-table td.sc { font-weight: 600; border-radius: 4px; }
+  .matches-table td.sc-hi { background: #e6f4ea; color: #137333; }
+  .matches-table td.sc-mid { background: #fef7e0; color: #b06000; }
+  .matches-table td.sc-lo { background: #fce8e6; color: #c5221f; }
+  .matches-table td.sc-un { color: #8a919c; } /* snippet-only or "unclear" — deliberately muted */
+  .matches-table td.sc-blk { background: #fdf1f1; border: 1px dashed #e6a5a5; color: #c5221f; cursor: help; } /* fetch blocked — loud, not a score */
+  .hint.vbusy { color: #0b57d0; animation: pulse 1s infinite; }
+  .hint.warn { color: #b3261e; }
   [data-tip] { position: relative; cursor: help; margin-left: 6px; }
   [data-tip]::after {
     content: attr(data-tip);
@@ -125,7 +133,7 @@
         <button id="openAll" title="Your browser may block bulk popups — rows open individually">Open all in tabs</button>
       </div>
     </div>
-    <div class="grid-header"><span>platform</span><span data-tip="pages = results found on this platform (Brave site: search; exact up to 60, 60+ means more). Click a platform row to expand it.">pages</span><span data-tip="jobs = results that scored 3+ on the is-it-real scale. Expand a platform for its ranked matches; hover rel/job there for the 0-4 legends.">jobs</span><span></span></div>
+    <div class="grid-header"><span>platform</span><span data-tip="pages = results found on this platform (Brave site: search; exact up to 60, 60+ means more). Click a platform row to expand it.">pages</span><span data-tip="jobs = results that scored 3+ on the is-it-real scale. Expand a platform for ranked matches with rel/job/loc/live — loc & live get re-scored from the actual posting pages when you expand.">jobs</span><span></span></div>
     <div id="rows"><div id="empty">Enter keywords and click Search — links appear instantly, counts fill in per platform (~1/sec).</div></div>
   </section>
 </main>
@@ -184,17 +192,36 @@ async function fetchRow(r, skipCache = false) {
         body: JSON.stringify({ query: r.query, keywords: state.k, location: state.l, results: res.results }),
       }).then((x) => x.json());
       if (!ai.disabled && ai.scores) {
-        r.matches = res.results.map((m, i) => ({
-          title: m.title, url: m.url,
-          job: ai.scores.find((s) => s.i === i)?.job ?? null,
-          rel: ai.scores.find((s) => s.i === i)?.rel ?? null,
-        })).sort((a, b) => (b.rel ?? -1) - (a.rel ?? -1));
+        r.matches = res.results.map((m, i) => {
+          const s = ai.scores.find((x) => x.i === i);
+          return { title: m.title, url: m.url, job: s?.job ?? null, rel: s?.rel ?? null, loc: s?.loc ?? null, live: s?.live ?? null, v: false };
+        }).sort((a, b) => (b.rel ?? -1) - (a.rel ?? -1));
         r.jobs = r.matches.filter((m) => (m.job ?? 0) >= 3).length; // ≥3 on 0–4 rubric = real posting
       }
     }
     r.status = "done"; cachePut(r.query, r);
   } catch (e) { r.status = "err"; r.err = String(e.message || e).slice(0, 60); }
   renderRows();
+}
+
+// verify pass: re-score loc/live from the real posting pages (runs on expand, top 10)
+async function verifyRow(r) {
+  if (r.vbusy || r.verified || !r.matches?.length) return;
+  r.verified = true; r.vbusy = true; renderRows();
+  try {
+    const urls = r.matches.filter((m) => !m.v).slice(0, 10).map((m) => m.url);
+    const res = await fetch("/api/verify", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urls, keywords: state.k, location: state.l }),
+    }).then((x) => x.json());
+    for (const s of res.scores || []) {
+      const m = r.matches.find((x) => x.url === urls[s.i]);
+      if (!m) continue;
+      if (s.ok) { m.loc = s.loc; m.live = s.live; m.v = true; m.verr = null; }
+      else m.verr = s.err; // blocked/timeout/404 — shown as ✕, never silently "unclear"
+    }
+  } catch (e) { /* snippet scores remain */ }
+  r.vbusy = false; cachePut(r.query, r); renderRows();
 }
 
 // ---- search ----
@@ -231,16 +258,32 @@ function rowVal(r) { // sort value; null = keep original position
   if (state.sort === "jobs" && r.jobs != null) return r.jobs;
   return pages;
 }
-const REL_TIP = "Relevance to YOU: how well does this posting match your keywords + location? 0 unrelated · 1 different role · 2 partially relevant · 3 relevant · 4 strong match";
-const JOB_TIP = "Is it real?: is this an individual job posting for an open role (not a blog or category page)? 0 clearly not · 1 probably not · 2 unclear · 3 probably real · 4 definitely real";
+const REL_TIP = "rel — how well the posting matches your KEYWORDS (location is scored separately as loc). 0 unrelated · 1 different role · 2 partially relevant · 3 relevant · 4 strong match";
+const JOB_TIP = "job — is it an individual job posting for an open role (not a blog or category page)? 0 clearly not · 1 probably not · 2 unclear · 3 probably real · 4 definitely real";
+const LOC_TIP = "loc — posted work location vs your search location. Muted = judged from the search snippet only (weak evidence); expanding the row re-scores it from the posting page itself. 0 unknown · 1 different country · 2 same country elsewhere · 3 same region/remote · 4 matches. ✕ = page fetch was blocked.";
+const LIVE_TIP = "live — is the posting still open and accepting applications? Muted = snippet-only evidence; expanding re-scores it from the posting page. 0 expired/no longer available · 1 stale · 2 unclear · 3 looks open · 4 explicitly open (future closing date). ✕ = page fetch was blocked.";
+const scoreCls = (v) => (v >= 3 ? "sc-hi" : v >= 2 ? "sc-mid" : "sc-lo");
+const locCls = (v) => (v === 0 ? "sc-un" : scoreCls(v)); // 0 = "unknown" → muted, not alarm-red
+const liveCls = (v) => (v >= 1.5 && v < 2.5 ? "sc-un" : scoreCls(v)); // ≈2 "unclear" → muted, real signals get colour
 
 function matchHtml(m) {
-  return `<tr class="${(m.job ?? 0) < 3 ? "dim" : ""}"><td><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a></td><td class="num">${m.rel != null ? m.rel.toFixed(1) : "–"}</td><td class="num">${m.job != null ? m.job.toFixed(1) : "–"}</td></tr>`;
+  const cell = (v, cls) => `<td class="num sc ${v != null ? cls : ""}">${v != null ? v.toFixed(1) : "–"}</td>`;
+  const blk = `<td class="num sc sc-blk" title="posting page could not be fetched: ${esc(m.verr || "blocked")}">✕</td>`;
+  const locCell = m.verr ? blk : cell(m.loc, m.v ? locCls(m.loc) : "sc-un"); // m.v = verified from page
+  const liveCell = m.verr ? blk : cell(m.live, m.v ? liveCls(m.live) : "sc-un");
+  return `<tr class="${(m.job ?? 0) < 3 ? "dim" : ""}"><td><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a></td>${cell(m.rel, scoreCls(m.rel))}${cell(m.job, scoreCls(m.job))}${locCell}${liveCell}</tr>`;
 }
 function matchBody(r) {
   if (r.status !== "done") return "";
-  if (r.matches?.length)
-    return `<table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th></tr></thead><tbody>${r.matches.map(matchHtml).join("")}</tbody></table>`;
+  const n = r.matches?.length || 0;
+  const notes = [];
+  if (r.vbusy) notes.push(`<div class="hint vbusy">fetching posting pages — verifying loc/live …</div>`);
+  else {
+    const bad = r.matches?.filter((m) => m.verr) || [];
+    if (bad.length) notes.push(`<div class="hint warn">⚠ ${bad.length} of ${n} posting pages could not be fetched (${[...new Set(bad.map((m) => m.verr))].join(", ")}) — those show ✕ and stay snippet-scored</div>`);
+    else if (r.matches?.some((m) => !m.v)) notes.push(`<div class="hint">loc/live are snippet-scored above — expanding this row re-scores them from the actual posting pages${n > 10 ? " (top 10)" : ""}</div>`);
+  }
+  if (n) return `<table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th><th class="num" data-tip="${LOC_TIP}">loc</th><th class="num" data-tip="${LIVE_TIP}">live</th></tr></thead><tbody>${r.matches.map(matchHtml).join("")}</tbody></table>${notes.join("")}`;
   if (r.count) return `<div class="hint">raw pages only — TypeSafe key off, so no job filtering or ranking</div>`;
   return `<div class="hint">0 results on Brave — try the G link to double-check Google</div>`;
 }
@@ -318,6 +361,12 @@ $("#rows").addEventListener("click", (e) => {
     if (r) fetchRow(r, true);
   }
 });
+$("#rows").addEventListener("toggle", (e) => { // toggle doesn't bubble — capture from the container
+  const d = e.target.closest?.(".prow");
+  if (!d?.open) return;
+  const r = state.rows.find((x) => x.id === d.dataset.pid);
+  if (r?.matches?.length) verifyRow(r);
+}, true);
 $("#sortBtns").addEventListener("click", (e) => {
   const s = e.target.dataset?.sort;
   if (s) { state.sort = s; document.querySelectorAll("#sortBtns button[data-sort]").forEach((b) => b.classList.toggle("active", b.dataset.sort === s)); renderRows(); }
