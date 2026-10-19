@@ -48,7 +48,16 @@
   details.matches li { margin-bottom: 4px; }
   details.matches li.dim { color: #8a919c; }
   .badges { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #5c6470; margin-left: 6px; }
-  .badge { cursor: help; text-decoration: underline dotted #c3c8cf; text-underline-offset: 3px; margin-left: 6px; }
+  [data-tip] { position: relative; cursor: help; text-decoration: underline dotted #c3c8cf; text-underline-offset: 3px; margin-left: 6px; }
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute; right: 0; bottom: calc(100% + 6px);
+    background: #1a1d21; color: #fff; font-size: 11px; line-height: 1.5;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 400;
+    padding: 8px 10px; border-radius: 6px; width: 280px; text-align: left;
+    opacity: 0; visibility: hidden; transition: opacity 0.15s; z-index: 10; pointer-events: none;
+  }
+  [data-tip]:hover::after { opacity: 1; visibility: visible; }
   .plat { display: grid; grid-template-columns: auto minmax(70px, 0.8fr) minmax(140px, 1.4fr) auto; gap: 6px; margin-bottom: 6px; align-items: center; }
   .plat input { padding: 5px 7px; font-size: 12px; min-width: 0; }
   .plat button, #platAdd button { padding: 4px 8px; }
@@ -202,7 +211,7 @@ function countsText(r) {
   const pN = r.capped ? `${r.count}+` : r.count;
   const pW = r.capped || r.count !== 1 ? "pages" : "page";
   const jW = r.jobs === 1 ? "job" : "jobs";
-  return `${pN} ${pW}${r.jobs != null ? ` · ${r.jobs} ${jW}` : ""}`;
+  return `<span data-tip="${PAGES_TIP}">${pN} ${pW}</span>${r.jobs != null ? ` · <span data-tip="${JOBS_TIP}">${r.jobs} ${jW}</span>` : ""}`;
 }
 function rowVal(r) { // sort value; null = keep original position
   if (r.status !== "done") return null;
@@ -210,11 +219,14 @@ function rowVal(r) { // sort value; null = keep original position
   if (state.sort === "jobs" && r.jobs != null) return r.jobs;
   return pages;
 }
+const REL_TIP = "Relevance to YOU: how well does this posting match your keywords + location? 0 unrelated · 1 different role · 2 partially relevant · 3 relevant · 4 strong match";
+const JOB_TIP = "Is it real?: is this an individual job posting for an open role (not a blog or category page)? 0 clearly not · 1 probably not · 2 unclear · 3 probably real · 4 definitely real";
+const PAGES_TIP = "pages = results found on this platform (Brave site: search; exact up to 60, 60+ means more). Click the ▶ line to see them ranked.";
+const JOBS_TIP = "jobs = results that scored 3+ on the is-it-real scale. Expand this row and hover any rel/job badge for the full 0-4 legend.";
+
 function matchHtml(m) {
-  const relTitle = "Relevance to YOU: how well does this posting match your keywords + location? 0 unrelated · 1 different role · 2 partially relevant · 3 relevant · 4 strong match";
-  const jobTitle = "Is it real?: is this an individual job posting for an open role (not a blog or category page)? 0 clearly not · 1 probably not · 2 unclear · 3 probably real · 4 definitely real";
   return `<li class="${(m.job ?? 0) < 3 ? "dim" : ""}"><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a>` +
-    (m.rel != null ? `<span class="badges"><span class="badge" title="${relTitle}">rel ${m.rel.toFixed(1)}</span><span class="badge" title="${jobTitle}">job ${m.job?.toFixed(1)}</span></span>` : "") + `</li>`;
+    (m.rel != null ? `<span class="badges"><span class="badge" data-tip="${REL_TIP}">rel ${m.rel.toFixed(1)}</span><span class="badge" data-tip="${JOB_TIP}">job ${m.job?.toFixed(1)}</span></span>` : "") + `</li>`;
 }
 function renderRows() {
   const rows = [...state.rows].sort((a, b) => {
