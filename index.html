@@ -48,6 +48,7 @@
   details.matches li { margin-bottom: 4px; }
   details.matches li.dim { color: #8a919c; }
   .badges { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #5c6470; margin-left: 6px; }
+  .badge { cursor: help; text-decoration: underline dotted #c3c8cf; text-underline-offset: 3px; margin-left: 6px; }
   .plat { display: grid; grid-template-columns: auto minmax(70px, 0.8fr) minmax(140px, 1.4fr) auto; gap: 6px; margin-bottom: 6px; align-items: center; }
   .plat input { padding: 5px 7px; font-size: 12px; min-width: 0; }
   .plat button, #platAdd button { padding: 4px 8px; }
@@ -210,8 +211,10 @@ function rowVal(r) { // sort value; null = keep original position
   return pages;
 }
 function matchHtml(m) {
+  const relTitle = "Relevance to YOU: how well does this posting match your keywords + location? 0 unrelated · 1 different role · 2 partially relevant · 3 relevant · 4 strong match";
+  const jobTitle = "Is it real?: is this an individual job posting for an open role (not a blog or category page)? 0 clearly not · 1 probably not · 2 unclear · 3 probably real · 4 definitely real";
   return `<li class="${(m.job ?? 0) < 3 ? "dim" : ""}"><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a>` +
-    (m.rel != null ? `<span class="badges">rel ${m.rel.toFixed(1)} · job ${m.job?.toFixed(1)}</span>` : "") + `</li>`;
+    (m.rel != null ? `<span class="badges"><span class="badge" title="${relTitle}">rel ${m.rel.toFixed(1)}</span><span class="badge" title="${jobTitle}">job ${m.job?.toFixed(1)}</span></span>` : "") + `</li>`;
 }
 function renderRows() {
   const rows = [...state.rows].sort((a, b) => {
