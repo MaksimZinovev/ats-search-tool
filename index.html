@@ -29,9 +29,17 @@
   #resultsHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   #sortBtns button { padding: 4px 10px; font-size: 12px; }
   #sortBtns button.active { background: #0b57d0; color: #fff; border-color: #0b57d0; }
-  .row { border: 1px solid #e3e6ea; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
-  .row.zero { opacity: .5; }
-  .rmain { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .grid-header, .prow summary { display: grid; grid-template-columns: minmax(160px, 1fr) 80px 80px minmax(140px, auto); gap: 10px; align-items: center; padding: 8px 12px; }
+  .grid-header { color: #5c6470; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid #e3e6ea; padding-left: 28px; }
+  .grid-header span:nth-child(2), .grid-header span:nth-child(3), .prow summary .counts { text-align: right; }
+  .grid-header [data-tip] { margin-left: 0; }
+  .prow { border-bottom: 1px solid #e3e6ea; }
+  .prow summary { cursor: pointer; list-style: none; position: relative; padding-left: 28px; }
+  .prow summary::-webkit-details-marker { display: none; }
+  .prow summary::before { content: "▸"; position: absolute; left: 12px; color: #8a919c; }
+  .prow[open] summary::before { content: "▾"; }
+  .prow.zero summary { opacity: .55; }
+  .pbody { padding: 2px 12px 12px 26px; }
   .pname { font-weight: 600; }
   .dom { font-weight: 400; color: #8a919c; font-size: 12px; margin-left: 6px; }
   .counts { margin-left: auto; font-family: ui-monospace, Menlo, monospace; font-size: 13px; white-space: nowrap; }
@@ -42,13 +50,13 @@
   .links a { color: #0b57d0; text-decoration: none; font-size: 13px; }
   .links a.g { border: 1px solid #d4d9df; border-radius: 4px; padding: 1px 6px; font-weight: 700; }
   .rf { padding: 2px 8px; font-size: 13px; }
-  details.matches { margin-top: 8px; }
-  details.matches summary { font-size: 12px; font-weight: 400; color: #0b57d0; }
-  details.matches ul { margin: 6px 0 0; padding-left: 18px; }
-  details.matches li { margin-bottom: 4px; }
-  details.matches li.dim { color: #8a919c; }
-  .badges { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #5c6470; margin-left: 6px; }
-  [data-tip] { position: relative; cursor: help; text-decoration: underline dotted #c3c8cf; text-underline-offset: 3px; margin-left: 6px; }
+  .matches-table { width: 100%; border-collapse: collapse; margin-top: 2px; font-size: 13px; }
+  .matches-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #5c6470; padding: 4px 8px; border-bottom: 1px solid #e3e6ea; }
+  .matches-table td { padding: 6px 8px; border-bottom: 1px solid #f0f2f5; vertical-align: top; }
+  .matches-table th.num, .matches-table td.num { text-align: right; width: 52px; font-family: ui-monospace, Menlo, monospace; }
+  .matches-table th[data-tip] { margin-left: 0; text-decoration: underline dotted #c3c8cf; text-underline-offset: 3px; }
+  .matches-table tr.dim { color: #8a919c; }
+  [data-tip] { position: relative; cursor: help; margin-left: 6px; }
   [data-tip]::after {
     content: attr(data-tip);
     position: absolute; right: 0; bottom: calc(100% + 6px);
@@ -117,6 +125,7 @@
         <button id="openAll" title="Your browser may block bulk popups — rows open individually">Open all in tabs</button>
       </div>
     </div>
+    <div class="grid-header"><span>platform</span><span data-tip="pages = results found on this platform (Brave site: search; exact up to 60, 60+ means more). Click a platform row to expand it.">pages</span><span data-tip="jobs = results that scored 3+ on the is-it-real scale. Expand a platform for its ranked matches; hover rel/job there for the 0-4 legends.">jobs</span><span></span></div>
     <div id="rows"><div id="empty">Enter keywords and click Search — links appear instantly, counts fill in per platform (~1/sec).</div></div>
   </section>
 </main>
@@ -204,14 +213,17 @@ async function search() {
 }
 
 // ---- render ----
-function countsText(r) {
+function pagesText(r) {
   if (r.status === "link") return "—";
   if (r.status === "dot") return "…";
   if (r.status === "err") return esc(r.err || "error");
-  const pN = r.capped ? `${r.count}+` : r.count;
   const pW = r.capped || r.count !== 1 ? "pages" : "page";
-  const jW = r.jobs === 1 ? "job" : "jobs";
-  return `<span data-tip="${PAGES_TIP}">${pN} ${pW}</span>${r.jobs != null ? ` · <span data-tip="${JOBS_TIP}">${r.jobs} ${jW}</span>` : ""}`;
+  return `${r.capped ? `${r.count}+` : r.count} ${pW}`;
+}
+function jobsText(r) {
+  if (r.status === "dot") return "…";
+  if (r.status !== "done" || r.jobs == null) return "—";
+  return `${r.jobs} ${r.jobs === 1 ? "job" : "jobs"}`;
 }
 function rowVal(r) { // sort value; null = keep original position
   if (r.status !== "done") return null;
@@ -221,14 +233,19 @@ function rowVal(r) { // sort value; null = keep original position
 }
 const REL_TIP = "Relevance to YOU: how well does this posting match your keywords + location? 0 unrelated · 1 different role · 2 partially relevant · 3 relevant · 4 strong match";
 const JOB_TIP = "Is it real?: is this an individual job posting for an open role (not a blog or category page)? 0 clearly not · 1 probably not · 2 unclear · 3 probably real · 4 definitely real";
-const PAGES_TIP = "pages = results found on this platform (Brave site: search; exact up to 60, 60+ means more). Click the ▶ line to see them ranked.";
-const JOBS_TIP = "jobs = results that scored 3+ on the is-it-real scale. Expand this row and hover any rel/job badge for the full 0-4 legend.";
 
 function matchHtml(m) {
-  return `<li class="${(m.job ?? 0) < 3 ? "dim" : ""}"><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a>` +
-    (m.rel != null ? `<span class="badges"><span class="badge" data-tip="${REL_TIP}">rel ${m.rel.toFixed(1)}</span><span class="badge" data-tip="${JOB_TIP}">job ${m.job?.toFixed(1)}</span></span>` : "") + `</li>`;
+  return `<tr class="${(m.job ?? 0) < 3 ? "dim" : ""}"><td><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a></td><td class="num">${m.rel != null ? m.rel.toFixed(1) : "–"}</td><td class="num">${m.job != null ? m.job.toFixed(1) : "–"}</td></tr>`;
+}
+function matchBody(r) {
+  if (r.status !== "done") return "";
+  if (r.matches?.length)
+    return `<table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th></tr></thead><tbody>${r.matches.map(matchHtml).join("")}</tbody></table>`;
+  if (r.count) return `<div class="hint">raw pages only — TypeSafe key off, so no job filtering or ranking</div>`;
+  return `<div class="hint">0 results on Brave — try the G link to double-check Google</div>`;
 }
 function renderRows() {
+  const open = new Set([...document.querySelectorAll(".prow[open]")].map((d) => d.dataset.pid)); // keep sections expanded across re-renders
   const rows = [...state.rows].sort((a, b) => {
     const va = rowVal(a), vb = rowVal(b);
     if (va === null && vb === null) return 0;
@@ -236,18 +253,19 @@ function renderRows() {
     return vb - va;
   });
   $("#rows").innerHTML = state.rows.length ? rows.map((r) => `
-    <div class="row ${r.status === "done" && !r.count ? "zero" : ""}">
-      <div class="rmain">
+    <details class="prow ${r.status === "done" && !r.count ? "zero" : ""}" data-pid="${esc(r.id)}" ${open.has(r.id) ? "open" : ""}>
+      <summary>
         <span class="pname">${esc(r.name)}<span class="dom">${esc(r.domain)}</span></span>
-        <span class="counts ${r.status}">${countsText(r)}</span>
+        <span class="counts ${r.status}">${pagesText(r)}</span>
+        <span class="counts ${r.status}">${jobsText(r)}</span>
         <span class="links">
           <a href="${r.bUrl}" target="_blank">Brave↗</a>
           <a class="g" href="${r.gUrl}" target="_blank" title="Open on Google">G</a>
           <button class="rf" data-q="${esc(r.query)}" title="Refresh (clears 24h cache)">↻</button>
         </span>
-      </div>
-      ${r.matches?.length ? `<details class="matches"><summary>${r.matches.length} results — ranked by relevance</summary><ul>${r.matches.map(matchHtml).join("")}</ul></details>` : ""}
-    </div>`).join("")
+      </summary>
+      <div class="pbody">${matchBody(r)}</div>
+    </details>`).join("")
     : `<div id="empty">Enter keywords and click Search — links appear instantly, counts fill in per platform (~1/sec).</div>`;
 }
 
@@ -295,6 +313,7 @@ $("#searchBtn").addEventListener("click", search);
 [$("#k"), $("#l")].forEach((el) => el.addEventListener("keydown", (e) => { if (e.key === "Enter") search(); }));
 $("#rows").addEventListener("click", (e) => {
   if (e.target.classList.contains("rf")) {
+    e.preventDefault(); // keep the row collapsed while refreshing
     const r = state.rows.find((x) => x.query === e.target.dataset.q);
     if (r) fetchRow(r, true);
   }
