@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATS Search Tool</title>
+<style>
+  /* Light theme per INTENT.md (playground default dark overridden) */
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; background: #f7f8fa; color: #1a1d21; }
+  header { padding: 18px 24px 6px; }
+  h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0; color: #8a919c; }
+  #banner { margin: 6px 0 0; color: #9a6b00; font-size: 13px; }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 12px 24px 40px; }
+  aside { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
+  .panel, details { background: #fff; border: 1px solid #e3e6ea; border-radius: 8px; padding: 14px; }
+  h2 { font-size: 13px; margin: 0 0 10px; color: #5c6470; text-transform: uppercase; letter-spacing: .04em; }
+  summary { cursor: pointer; font-weight: 600; font-size: 13px; color: #5c6470; }
+  label { display: block; margin-bottom: 10px; font-size: 12px; color: #5c6470; }
+  input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid #d4d9df; border-radius: 6px; font-size: 14px; background: #fff; }
+  input[type=text]:focus { outline: 2px solid #0b57d0; border-color: transparent; }
+  label.or { display: flex; gap: 8px; align-items: center; font-size: 13px; color: #1a1d21; }
+  button { padding: 8px 14px; border: 1px solid #d4d9df; border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; }
+  button:hover { background: #f0f2f5; }
+  #searchBtn { background: #0b57d0; border-color: #0b57d0; color: #fff; width: 100%; font-weight: 600; }
+  #searchBtn:disabled { opacity: .6; cursor: default; }
+  #results { background: #fff; border: 1px solid #e3e6ea; border-radius: 8px; padding: 14px; min-height: 200px; }
+  #resultsHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  #sortBtns button { padding: 4px 10px; font-size: 12px; }
+  #sortBtns button.active { background: #0b57d0; color: #fff; border-color: #0b57d0; }
+  .row { border: 1px solid #e3e6ea; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .row.zero { opacity: .5; }
+  .rmain { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .pname { font-weight: 600; }
+  .dom { font-weight: 400; color: #8a919c; font-size: 12px; margin-left: 6px; }
+  .counts { margin-left: auto; font-family: ui-monospace, Menlo, monospace; font-size: 13px; white-space: nowrap; }
+  .counts.dot { animation: pulse 1s infinite; }
+  .counts.err { color: #b3261e; font-size: 12px; }
+  @keyframes pulse { 50% { opacity: .4; } }
+  .links { display: flex; gap: 6px; align-items: center; }
+  .links a { color: #0b57d0; text-decoration: none; font-size: 13px; }
+  .links a.g { border: 1px solid #d4d9df; border-radius: 4px; padding: 1px 6px; font-weight: 700; }
+  .rf { padding: 2px 8px; font-size: 13px; }
+  details.matches { margin-top: 8px; }
+  details.matches summary { font-size: 12px; font-weight: 400; color: #0b57d0; }
+  details.matches ul { margin: 6px 0 0; padding-left: 18px; }
+  details.matches li { margin-bottom: 4px; }
+  details.matches li.dim { color: #8a919c; }
+  .badges { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #5c6470; margin-left: 6px; }
+  .plat { display: grid; grid-template-columns: auto minmax(70px, 0.8fr) minmax(140px, 1.4fr) auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .plat input { padding: 5px 7px; font-size: 12px; min-width: 0; }
+  .plat button, #platAdd button { padding: 4px 8px; }
+  #platAdd { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-top: 10px; }
+  .hint { font-size: 11px; color: #8a919c; margin-top: 8px; }
+  .hist-item { padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .hist-item:hover { background: #f0f2f5; }
+  .hist-item small { color: #8a919c; margin-left: 6px; }
+  #histClear { margin-top: 8px; width: 100%; }
+  #empty { color: #8a919c; padding: 30px 10px; text-align: center; }
+  footer { padding: 0 24px 24px; color: #8a919c; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ATS Search Tool</h1>
+  <p>Counts across job-board platforms — links open on Brave (G = Google)</p>
+  <div id="banner"></div>
+</header>
+<main>
+  <aside>
+    <section class="panel">
+      <h2>Search</h2>
+      <label>ROLE KEYWORDS
+        <input type="text" id="k" placeholder='e.g. product designer — or qa, tester with OR mode'>
+      </label>
+      <label>LOCATION (optional)
+        <input type="text" id="l" placeholder="e.g. remote, Sydney">
+      </label>
+      <label class="or"><input type="checkbox" id="or"> Boolean OR mode — comma-separated terms</label>
+      <button id="searchBtn">Search</button>
+      <div class="hint" id="quotaHint"></div>
+    </section>
+    <details>
+      <summary id="platSum">Platforms</summary>
+      <div id="platList"></div>
+      <div id="platAdd">
+        <input type="text" id="pn" placeholder="name">
+        <input type="text" id="pd" placeholder="e.g. jobs.example.com">
+        <button id="padd">+</button>
+      </div>
+      <div class="hint">Untick = hide · ✕ = remove · ↻ on a row refreshes its count</div>
+      <button id="restoreBtn" style="width:100%;margin-top:8px">Restore defaults</button>
+    </details>
+    <details>
+      <summary>History</summary>
+      <div id="histList"></div>
+      <button id="histClear">Clear history</button>
+    </details>
+  </aside>
+  <section id="results">
+    <div id="resultsHead">
+      <h2>Results</h2>
+      <div id="sortBtns">
+        <button data-sort="pages">pages</button>
+        <button data-sort="jobs" class="active">jobs</button>
+        <button id="openAll" title="Your browser may block bulk popups — rows open individually">Open all in tabs</button>
+      </div>
+    </div>
+    <div id="rows"><div id="empty">Enter keywords and click Search — links appear instantly, counts fill in per platform (~1/sec).</div></div>
+  </section>
+</main>
+<footer>Runs locally — nothing leaves this machine except search queries to Brave/TypeSafe. Free tier: 2,000 Brave queries/month (~1–3 per platform).</footer>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const PLAT_KEY = "ats-platforms-v1", HIST_KEY = "ats-history-v1", CACHE_KEY = "ats-cache-v1", TTL = 24 * 3600e3;
+
+const state = { k: "", l: "", or: false, platforms: [], rows: [], sort: "jobs", cfg: { brave: false, typesafe: false }, busy: false };
+
+const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+// mirrors lib.mjs (single-file constraint; keep in sync)
+function buildQuery(domain, keywords, location, orMode) {
+  const kw = (keywords || "").trim();
+  const terms = orMode && kw.includes(",")
+    ? kw.split(",").map((t) => t.trim()).filter(Boolean).map((t) => `"${t}"`).join(" OR ")
+    : `"${kw.replace(/"/g, "")}"`;
+  const loc = (location || "").trim();
+  return `site:${domain} ${terms}${loc ? " " + loc : ""}`;
+}
+const braveUrl = (q) => `https://search.brave.com/search?q=${encodeURIComponent(q)}`;
+const googleUrl = (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+
+// ---- cache (24h per query) ----
+function cacheGet(q) {
+  const c = lsGet(CACHE_KEY, {})[q];
+  return c && Date.now() - c.t < TTL ? c : null;
+}
+function cachePut(q, r) {
+  const c = lsGet(CACHE_KEY, {});
+  c[q] = { t: Date.now(), count: r.count, capped: r.capped, jobs: r.jobs, matches: r.matches };
+  const keys = Object.keys(c);
+  if (keys.length > 500) for (const k of keys.sort((a, b) => c[a].t - c[b].t).slice(0, keys.length - 500)) delete c[k];
+  lsSet(CACHE_KEY, c);
+}
+
+// ---- per-row pipeline (search loop + ↻ refresh) ----
+async function fetchRow(r, skipCache = false) {
+  const c = !skipCache && cacheGet(r.query);
+  if (c) { Object.assign(r, c, { status: "done" }); renderRows(); return; }
+  if (!state.cfg.brave) { r.status = "err"; r.err = "no Brave key"; renderRows(); return; }
+  r.status = "dot"; renderRows();
+  try {
+    const res = await fetch(`/api/count?q=${encodeURIComponent(r.query)}`).then((x) => x.json());
+    if (res.disabled) { r.status = "err"; r.err = "no Brave key"; renderRows(); return; }
+    r.count = res.count; r.capped = res.capped; r.matches = []; r.jobs = null;
+    if (state.cfg.typesafe && res.results?.length) {
+      const ai = await fetch("/api/ai", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: r.query, keywords: state.k, location: state.l, results: res.results }),
+      }).then((x) => x.json());
+      if (!ai.disabled && ai.scores) {
+        r.matches = res.results.map((m, i) => ({
+          title: m.title, url: m.url,
+          job: ai.scores.find((s) => s.i === i)?.job ?? null,
+          rel: ai.scores.find((s) => s.i === i)?.rel ?? null,
+        }));
+        r.jobs = r.matches.filter((m) => (m.job ?? 0) >= 3).length; // ≥3 on 0–4 rubric = real posting
+      }
+    }
+    r.status = "done"; cachePut(r.query, r);
+  } catch (e) { r.status = "err"; r.err = String(e.message || e).slice(0, 60); }
+  renderRows();
+}
+
+// ---- search ----
+async function search() {
+  const k = state.k.trim();
+  if (!k || state.busy) return;
+  state.busy = true; $("#searchBtn").disabled = true;
+  state.rows = state.platforms.filter((p) => !p.hidden).map((p) => {
+    const q = buildQuery(p.domain, k, state.l, state.or);
+    return { id: p.id, name: p.name, domain: p.domain, query: q, bUrl: braveUrl(q), gUrl: googleUrl(q),
+      status: "link", count: null, capped: null, jobs: null, matches: [], err: null };
+  });
+  renderRows(); pushHistory();
+  for (const r of state.rows) { await fetchRow(r); await sleep(350); } // ponytail: crude 1qps pacing + server 429 retry
+  state.busy = false; $("#searchBtn").disabled = false;
+}
+
+// ---- render ----
+function countsText(r) {
+  if (r.status === "link") return "—";
+  if (r.status === "dot") return "…";
+  if (r.status === "err") return esc(r.err || "error");
+  const pages = r.capped ? `${r.count}+` : r.count;
+  return `${pages} pages${r.jobs != null ? ` · ${r.jobs} jobs` : ""}`;
+}
+function rowVal(r) { // sort value; null = keep original position
+  if (r.status !== "done") return null;
+  const pages = r.capped ? r.count + 1 : r.count;
+  if (state.sort === "jobs" && r.jobs != null) return r.jobs;
+  return pages;
+}
+function matchHtml(m) {
+  return `<li class="${(m.job ?? 0) < 3 ? "dim" : ""}"><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a>` +
+    (m.rel != null ? `<span class="badges">rel ${m.rel.toFixed(1)} · job ${m.job?.toFixed(1)}</span>` : "") + `</li>`;
+}
+function renderRows() {
+  const rows = [...state.rows].sort((a, b) => {
+    const va = rowVal(a), vb = rowVal(b);
+    if (va === null && vb === null) return 0;
+    if (va === null) return 1; if (vb === null) return -1;
+    return vb - va;
+  });
+  $("#rows").innerHTML = state.rows.length ? rows.map((r) => `
+    <div class="row ${r.status === "done" && !r.count ? "zero" : ""}">
+      <div class="rmain">
+        <span class="pname">${esc(r.name)}<span class="dom">${esc(r.domain)}</span></span>
+        <span class="counts ${r.status}">${countsText(r)}</span>
+        <span class="links">
+          <a href="${r.bUrl}" target="_blank">Brave↗</a>
+          <a class="g" href="${r.gUrl}" target="_blank" title="Open on Google">G</a>
+          <button class="rf" data-q="${esc(r.query)}" title="Refresh (clears 24h cache)">↻</button>
+        </span>
+      </div>
+      ${r.matches?.length ? `<details class="matches"><summary>${r.matches.length} results — ranked by relevance</summary><ul>${r.matches.map(matchHtml).join("")}</ul></details>` : ""}
+    </div>`).join("")
+    : `<div id="empty">Enter keywords and click Search — links appear instantly, counts fill in per platform (~1/sec).</div>`;
+}
+
+// ---- history ----
+function pushHistory() {
+  const h = lsGet(HIST_KEY, []);
+  if (!(h[0]?.k === state.k && h[0]?.l === state.l && h[0]?.or === state.or)) h.unshift({ k: state.k, l: state.l, or: state.or, ts: Date.now() });
+  lsSet(HIST_KEY, h.slice(0, 50));
+  renderHistory();
+}
+function renderHistory() {
+  const h = lsGet(HIST_KEY, []);
+  $("#histList").innerHTML = h.map((e, i) =>
+    `<div class="hist-item" data-hi="${i}">${esc(e.k)}${e.l ? ` — ${esc(e.l)}` : ""}<small>${e.or ? "OR " : ""}${new Date(e.ts).toLocaleDateString()}</small></div>`).join("")
+    || `<div class="hint">No searches yet.</div>`;
+}
+
+// ---- platforms CRUD ----
+function savePlatforms() { lsSet(PLAT_KEY, state.platforms); }
+function renderPlatforms() {
+  $("#platList").innerHTML = state.platforms.map((p, i) => `
+    <div class="plat">
+      <input type="checkbox" data-pi="${i}" data-f="hidden" ${p.hidden ? "" : "checked"} title="visible in search">
+      <input type="text" data-pi="${i}" data-f="name" value="${esc(p.name)}" title="name">
+      <input type="text" data-pi="${i}" data-f="domain" value="${esc(p.domain)}" title="domain">
+      <button data-pi="${i}" data-f="del" title="remove">✕</button>
+    </div>`).join("");
+  $("#platSum").textContent = `Platforms (${state.platforms.filter((p) => !p.hidden).length}/${state.platforms.length} visible)`;
+}
+
+// ---- banner ----
+function renderBanner() {
+  const miss = [];
+  if (!state.cfg.brave) miss.push('counts disabled — add BRAVE_API_KEY to .env (see README)');
+  if (!state.cfg.typesafe) miss.push('job filtering disabled — add TYPESAFE_API_KEY to .env');
+  $("#banner").textContent = miss.length ? "⚠ " + miss.join(" · ") : "";
+  $("#quotaHint").textContent = state.cfg.brave ? "Counts auto-fetch per platform (~1/sec); cached 24h — repeat searches are free." : "";
+}
+
+// ---- events ----
+$("#k").addEventListener("input", (e) => state.k = e.target.value);
+$("#l").addEventListener("input", (e) => state.l = e.target.value);
+$("#or").addEventListener("change", (e) => state.or = e.target.checked);
+$("#searchBtn").addEventListener("click", search);
+[$("#k"), $("#l")].forEach((el) => el.addEventListener("keydown", (e) => { if (e.key === "Enter") search(); }));
+$("#rows").addEventListener("click", (e) => {
+  if (e.target.classList.contains("rf")) {
+    const r = state.rows.find((x) => x.query === e.target.dataset.q);
+    if (r) fetchRow(r, true);
+  }
+});
+$("#sortBtns").addEventListener("click", (e) => {
+  const s = e.target.dataset?.sort;
+  if (s) { state.sort = s; document.querySelectorAll("#sortBtns button[data-sort]").forEach((b) => b.classList.toggle("active", b.dataset.sort === s)); renderRows(); }
+});
+$("#openAll").addEventListener("click", () => {
+  // ponytail: staggered window.open; popup blockers cap this — rows open individually
+  state.rows.forEach((r, i) => setTimeout(() => window.open(r.bUrl, "_blank"), i * 150));
+});
+$("#platList").addEventListener("change", (e) => {
+  const p = state.platforms[+e.target.dataset.pi], f = e.target.dataset.f;
+  if (!p) return;
+  if (f === "hidden") p.hidden = !e.target.checked;
+  else p[e.target.dataset.f] = e.target.value.trim();
+  savePlatforms(); renderPlatforms();
+});
+$("#platList").addEventListener("click", (e) => {
+  if (e.target.dataset?.f === "del") {
+    state.platforms.splice(+e.target.dataset.pi, 1);
+    savePlatforms(); renderPlatforms();
+  }
+});
+$("#padd").addEventListener("click", () => {
+  const d = $("#pd").value.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!d) return;
+  state.platforms.push({ id: "c" + Date.now(), name: $("#pn").value.trim() || d, domain: d, builtin: false, custom: true, hidden: false });
+  $("#pn").value = $("#pd").value = "";
+  savePlatforms(); renderPlatforms();
+});
+$("#restoreBtn").addEventListener("click", async () => {
+  if (!confirm("Reset platforms to the 18 defaults? Custom entries will be removed.")) return;
+  state.platforms = await fetch("/api/platforms").then((r) => r.json());
+  savePlatforms(); renderPlatforms();
+});
+$("#histList").addEventListener("click", (e) => {
+  const el = e.target.closest(".hist-item");
+  if (!el) return;
+  const h = lsGet(HIST_KEY, [])[+el.dataset.hi];
+  if (!h) return;
+  state.k = h.k; state.l = h.l; state.or = h.or;
+  $("#k").value = h.k; $("#l").value = h.l; $("#or").checked = h.or;
+  search();
+});
+$("#histClear").addEventListener("click", () => { lsSet(HIST_KEY, []); renderHistory(); });
+
+// ---- init ----
+(async () => {
+  state.cfg = await fetch("/api/config").then((r) => r.json());
+  state.platforms = lsGet(PLAT_KEY, null) || await fetch("/api/platforms").then((r) => r.json());
+  savePlatforms();
+  renderBanner(); renderPlatforms(); renderHistory();
+})();
+</script>
+</body>
+</html>
