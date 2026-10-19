@@ -129,3 +129,8 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 ## README restructured (borrowing jobkit README sections)
 - Borrowed per user request from github MaksimZinovev/jobkit: What (table-driven meaning of row columns), Why (the task-pain framing), Quick Start (sh block + "> Note:" tip + free-tier math), Structure (dependency-purpose file tree).
 - Updated stale facts: 18 -> 29 platforms (AU boards documented with region chips); grading documented as two passes (snippet pass rel/job; verify pass loc/live + deterministic gone-check); troubleshooting gained bot-check line; roadmap gained stop button + shareable URL state (from persisted critique backlog).
+
+## Published to GitHub (public)
+- Repo: https://github.com/MaksimZinovev/ats-search-tool (gh repo create --public --push, main -> origin/main).
+- Push safety audit on tracked tree: no key-shaped strings (config.toml keys empty, .env.example blank, PROGRESS mentions key names only); .env ignored locally and confirmed absent (404) on origin; assets = 3 UI screenshots.
+- Topics: ats, australia, brave-search, job-board, job-search, local-first.
