@@ -6,6 +6,10 @@ open on Brave, and TypeSafe grades every match on four axes.
 
 Runs 100% locally. Only leaves your machine: search queries to Brave/TypeSafe.
 
+![alt text](assets/screenshot.jpg)
+
+![alt text](assets/screenshot_expanded.jpg)  
+
 ## What
 
 A one-page explorer for **direct-employer postings** — the obscure jobs that
