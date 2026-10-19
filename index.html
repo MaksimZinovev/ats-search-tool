@@ -16,25 +16,22 @@
     --font-round: "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   body { margin: 0; font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink2); }
-  header { padding: 24px 24px 10px; }
-  h1 { margin: 0 0 10px; font: 700 30px/1.05 var(--font-round); letter-spacing: -.02em; color: var(--ink); }
-  header p { margin: 0; max-width: 68ch; }
-  header .lead { font-size: 15px; color: var(--ink2); margin-bottom: 8px; }
-  header .how { font-size: 13px; color: var(--mid); margin-bottom: 6px; }
-  header .trust { font-size: 12px; color: var(--stone); }
-  header code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: var(--line); border-radius: 9999px; padding: 1px 7px; }
-  #banner { margin: 6px 0 0; color: var(--warn); font-size: 13px; }
+  header { padding: 24px 24px 14px; }
+  h1 { margin: 0; font: 700 32px/1.05 var(--font-round); letter-spacing: -.02em; color: var(--ink); }
+  header .lead { margin: 8px 0 0; max-width: 68ch; font-size: 14px; color: var(--ink2); text-wrap: pretty; }
+  header .lead code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; background: var(--line); border-radius: 9999px; padding: 1px 7px; }
+  #banner { margin: 6px 0 0; color: var(--warn); font-size: 14px; }
   main { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 14px 24px 40px; }
   aside { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
   .panel, details { background: var(--snow); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
-  h2 { font-size: 12px; margin: 0 0 10px; color: var(--stone); text-transform: uppercase; letter-spacing: .04em; font-weight: 500; }
-  summary { cursor: pointer; font-weight: 500; font-size: 13px; color: var(--mid); }
-  label { display: block; margin-bottom: 10px; font-size: 12px; color: var(--mid); }
-  input[type=text] { width: 100%; padding: 8px 14px; border: 1px solid var(--line); border-radius: 9999px; font-size: 13px; background: var(--bg); color: var(--ink2); }
+  h2 { font-size: 11px; margin: 0 0 10px; color: var(--stone); text-transform: uppercase; letter-spacing: .04em; font-weight: 500; }
+  summary { cursor: pointer; font-weight: 500; font-size: 14px; color: var(--mid); }
+  label { display: block; margin-bottom: 10px; font-size: 11px; color: var(--mid); }
+  input[type=text] { width: 100%; padding: 8px 14px; border: 1px solid var(--line); border-radius: 9999px; font-size: 14px; background: var(--bg); color: var(--ink2); }
   input[type=text]::placeholder { color: var(--silver); }
   input[type=text]:focus-visible { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px var(--ring); }
-  label.or { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink2); }
-  button { padding: 6px 14px; border: 1px solid var(--line2); border-radius: 9999px; background: var(--bg); color: var(--text); cursor: pointer; font-size: 13px; font-weight: 500; }
+  label.or { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--ink2); }
+  button { padding: 6px 14px; border: 1px solid var(--line2); border-radius: 9999px; background: var(--bg); color: var(--text); cursor: pointer; font-size: 14px; font-weight: 500; }
   button:hover { background: var(--hover); }
   button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
   #searchBtn { background: var(--ink); border-color: var(--ink); color: #fff; width: 100%; padding: 10px 24px; font-weight: 500; font-family: var(--font-round); }
@@ -42,7 +39,7 @@
   #searchBtn:disabled { opacity: .6; cursor: default; }
   #results { background: var(--snow); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-height: 200px; }
   #resultsHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  #sortBtns button { padding: 4px 12px; font-size: 12px; border-color: transparent; background: transparent; color: var(--stone); }
+  #sortBtns button { padding: 4px 12px; font-size: 11px; border-color: transparent; background: transparent; color: var(--stone); }
   #sortBtns button:hover { color: var(--ink2); background: transparent; }
   #sortBtns button.active { background: var(--line); color: var(--ink2); border-color: var(--line); }
   .grid-header, .prow summary { display: grid; grid-template-columns: minmax(160px, 1fr) 80px 80px minmax(140px, auto); gap: 10px; align-items: center; padding: 8px 12px; }
@@ -58,18 +55,18 @@
   .prow.zero summary { opacity: .55; }
   .pbody { padding: 2px 12px 12px 26px; }
   .pname { font-weight: 500; }
-  .dom { font-weight: 400; color: var(--stone); font-size: 12px; margin-left: 6px; }
-  .region { font-size: 10px; font-weight: 500; background: var(--line); color: var(--ink2); border-radius: 9999px; padding: 2px 8px; margin-left: 8px; white-space: nowrap; }
-  .counts { margin-left: auto; font-family: ui-monospace, Menlo, monospace; font-size: 13px; white-space: nowrap; color: var(--mid); }
+  .dom { font-weight: 400; color: var(--stone); font-size: 11px; margin-left: 6px; }
+  .region { font-size: 11px; font-weight: 500; background: var(--line); color: var(--ink2); border-radius: 9999px; padding: 2px 8px; margin-left: 8px; white-space: nowrap; }
+  .counts { margin-left: auto; font-family: ui-monospace, Menlo, monospace; font-size: 14px; white-space: nowrap; color: var(--mid); }
   .counts.dot { animation: pulse 1s infinite; }
-  .counts.err { color: var(--err); font-size: 12px; }
+  .counts.err { color: var(--err); font-size: 11px; }
   @keyframes pulse { 50% { opacity: .4; } }
   .links { display: flex; gap: 6px; align-items: center; }
-  .links a { color: var(--ink2); text-decoration: none; font-size: 13px; }
+  .links a { color: var(--ink2); text-decoration: none; font-size: 14px; }
   .links a:hover { text-decoration: underline; }
   .links a.g { border: 1px solid var(--line2); border-radius: 9999px; padding: 1px 8px; font-weight: 500; }
-  .rf { padding: 2px 9px; font-size: 13px; }
-  .matches-table { width: 100%; border-collapse: collapse; margin-top: 2px; font-size: 13px; }
+  .rf { padding: 2px 9px; font-size: 14px; }
+  .matches-table { width: 100%; border-collapse: collapse; margin-top: 2px; font-size: 14px; }
   .matches-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--stone); padding: 4px 8px; border-bottom: 1px solid var(--line); font-weight: 500; }
   .matches-table td { padding: 6px 8px; border-bottom: 1px solid var(--snow); vertical-align: top; }
   .matches-table td a { color: var(--ink2); }
@@ -97,16 +94,16 @@
   }
   [data-tip]:hover::after { opacity: 1; visibility: visible; }
   .plat { display: grid; grid-template-columns: auto minmax(70px, 0.8fr) minmax(140px, 1.4fr) auto; gap: 6px; margin-bottom: 6px; align-items: center; }
-  .plat input { padding: 5px 10px; font-size: 12px; min-width: 0; }
+  .plat input { padding: 5px 10px; font-size: 11px; min-width: 0; }
   .plat button, #platAdd button { padding: 4px 10px; }
   #platAdd { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-top: 10px; }
   .hint { font-size: 11px; color: var(--stone); margin-top: 8px; }
-  .hist-item { padding: 6px 10px; border-radius: 9999px; cursor: pointer; font-size: 13px; }
+  .hist-item { padding: 6px 10px; border-radius: 9999px; cursor: pointer; font-size: 14px; }
   .hist-item:hover { background: var(--hover); }
-  .hist-item small { color: var(--silver); margin-left: 6px; }
+  .hist-item small { color: var(--silver); margin-left: 6px; font-size: 11px; }
   #histClear { margin-top: 8px; width: 100%; }
   #empty { color: var(--silver); padding: 30px 10px; text-align: center; }
-  footer { padding: 0 24px 24px; color: var(--silver); font-size: 12px; }
+  footer { padding: 0 24px 24px; color: var(--silver); font-size: 11px; }
   @media (prefers-reduced-motion: reduce) {
     .counts.dot, .hint.vbusy { animation: none; }
     [data-tip]::after { transition: none; }
@@ -116,9 +113,7 @@
 <body>
 <header>
   <h1>ATS Search Tool</h1>
-  <p class="lead">The role you want is probably sitting on a company's Applicant Tracking System (ATS) right now, invisible to Seek and LinkedIn. This page runs Google <code>site:</code> searches across 29 ATS platforms at once.</p>
-  <p class="how">Type keywords and a location, click Search, and per-platform counts fill in. Expand a platform row to see its matches, each graded 0 to 4 on keyword relevance, real-open-role odds, location fit and freshness. Expired, dead or unreachable pages are labelled, never hidden.</p>
-  <p class="trust">Everything runs on your machine; no accounts, and your API keys or history never leave it.</p>
+  <p class="lead">The role you want is probably on a company's Applicant Tracking System (ATS) right now, invisible to Seek and LinkedIn. This page runs Google <code>site:</code> searches across <span id="platCount">…</span> of them at once.</p>
   <div id="banner"></div>
 </header>
 <main>
@@ -133,6 +128,7 @@
       </label>
       <label class="or"><input type="checkbox" id="or"> Boolean OR mode (comma-separated terms)</label>
       <button id="searchBtn">Search</button>
+      <div class="hint howto">Expand a platform row for its ranked matches, each graded 0 to 4 on keyword relevance, real-open-role odds, location fit and freshness. Dead or unreachable pages are labelled, never hidden.</div>
       <div class="hint" id="quotaHint"></div>
     </section>
     <details>
@@ -165,7 +161,7 @@
     <div id="rows"><div id="empty">Enter keywords and click Search. Links appear instantly; counts fill in per platform at about one per second.</div></div>
   </section>
 </main>
-<footer>Runs locally; nothing leaves this machine except the search queries sent to Brave and TypeSafe. The free tier covers 2,000 Brave queries a month, about 1 to 3 per platform.</footer>
+<footer>Runs locally; nothing leaves this machine except the search queries sent to Brave and TypeSafe. No accounts; your API keys and history stay here. The free tier covers 2,000 Brave queries a month, about 1 to 3 per platform.</footer>
 
 <script>
 "use strict";
@@ -449,6 +445,7 @@ $("#histClear").addEventListener("click", () => { lsSet(HIST_KEY, []); renderHis
   state.cfg = await fetch("/api/config").then((r) => r.json());
   state.platforms = lsGet(PLAT_KEY, null) || await fetch("/api/platforms").then((r) => r.json());
   savePlatforms();
+  $("#platCount").textContent = state.platforms.length;
   renderBanner(); renderPlatforms(); renderHistory();
 })();
 </script>

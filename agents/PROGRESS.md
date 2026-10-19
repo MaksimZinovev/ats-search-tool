@@ -106,3 +106,11 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 - New 3-line header: lead (what it is + why: openings live on an ATS before Seek/LinkedIn see them; 29 platforms at once), how (counts fill per platform; expand for ranked matches graded 0-4 on relevance/open-posting odds/location/freshness), trust (runs locally, keys stay).
 - Unslop sweep of all user-visible strings: em dashes removed everywhere (header, footer, quota hint, empty state, placeholder, OR-mode label, tooltips now "label: definition", history separator, hint lines, server error strings "HTTP 403, the site blocked the fetch"); ~68ch line caps on header paragraphs; title-case panels unchanged (short labels).
 - Verified: h1 700/30px computed; paragraph widths ≤642px; script syntax OK; screenshot checked.
+
+## Impeccable critique → header improvements (user: "like wording, not the look", scoped to header)
+- Critique run (A: design review + browser geometry; B: detect.mjs + computed styles), snapshot written to .impeccable/critique/2026-10-19T10-03-54Z__index-html.md. Score 28/40.
+- Key finding: header = 259px prose wall before any control (Search btn at y=469); detector: flat-type-hierarchy (10-15px sizes, adjacent ratio ~1.08).
+- Header fixes applied (scoped): masthead (h1 32px/700 + single 2-3 line lead, dynamic #platCount so count never lies with custom platforms); how-it-works moved into Search panel as context hint; trust line merged into footer; text-wrap pretty on lead.
+- Type scale consolidated page-wide: {11, 14, 32} (nearest ratio 1.27 ≥ 1.25) — detector now CLEAN (exit 0); off-scale text-bearing elements: none.
+- Measurements: header 149px (was 259), Search btn y=355 (was 469), all text on-scale.
+- Backlog (persisted, not in scope): cancellable search (P2), shareable URL state (P2), static score legend (P3).
