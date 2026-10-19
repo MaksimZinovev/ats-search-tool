@@ -120,7 +120,7 @@ async function verifyPages(body) {
         redirect: "follow", signal: AbortSignal.timeout(10000),
       });
       fin = p.url || urls[i];
-      if (!p.ok) err = `HTTP ${p.status}${p.status === 403 || p.status === 429 ? " — site blocked the fetch" : ""}`;
+      if (!p.ok) err = `HTTP ${p.status}${p.status === 403 || p.status === 429 ? ", the site blocked the fetch" : ""}`;
       else {
         // layer 1, deterministic: a removed posting redirects to a board/list page, losing its
         // job-id path segment (greenhouse: .../jobs/678… → .../<company>?error=true). The "no
@@ -130,7 +130,7 @@ async function verifyPages(body) {
         if (!fSeg.includes(oSeg[oSeg.length - 1])) gone = true;
         else {
           page = pageText(await p.text());
-          if (page.length < 400) err = "page nearly empty — likely a bot check"; // challenge pages strip to a stub
+          if (page.length < 400) err = "page nearly empty, likely a bot check"; // challenge pages strip to a stub
         }
       }
     } catch (e) {

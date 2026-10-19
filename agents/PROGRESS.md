@@ -100,3 +100,9 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 - ONE documented chromatic exception: score-cell tints (green/amber/red) + ✕-blocked + warn/err text — they encode the graded signal the tool exists to show (user-approved feature; strict-grayscale variant offered but not requested).
 - Browser-verified (screenshots + computed styles): zero shadows on panels/summary/CTA, ink posting links, counts #525252-on-snow (≈7.5:1), hint stone (≈4.7:1), score pill radius 9999px, tooltip content/bg/border/visible at hover. Reduced-motion guard added (pulse + tooltip fade).
 - Impeccable skill updated 3.5.0 → 4.6.0 (user-level; applies next session).
+
+## Header copy + title (user: friendlier for first-timers, bolder title)
+- h1: 500/24px → 700/30px SF Pro Rounded (user-directed weight bump; sole documented deviation from the Ollama ≤500 restraint).
+- New 3-line header: lead (what it is + why: openings live on an ATS before Seek/LinkedIn see them; 29 platforms at once), how (counts fill per platform; expand for ranked matches graded 0-4 on relevance/open-posting odds/location/freshness), trust (runs locally, keys stay).
+- Unslop sweep of all user-visible strings: em dashes removed everywhere (header, footer, quota hint, empty state, placeholder, OR-mode label, tooltips now "label: definition", history separator, hint lines, server error strings "HTTP 403, the site blocked the fetch"); ~68ch line caps on header paragraphs; title-case panels unchanged (short labels).
+- Verified: h1 700/30px computed; paragraph widths ≤642px; script syntax OK; screenshot checked.
