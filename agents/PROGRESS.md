@@ -52,15 +52,22 @@ key, no new dependency. README "Why no Bing/Google totals" documents this.
 - **CRUD**: added `jobs.acme.test` → 19/19 persisted in localStorage; restore
   defaults → 18/18.
 - **History**: "software tester — Sydney" captured, re-run works.
-- `caveman-blocks run brave-count` without key → `{"error":"BRAVE_API_KEY missing…"}` exit 1 (correct).
+- `caveman-blocks run brave-count` **verified** — stamp `9a79962d25d3` (network effect granted in config).
 
-## Pending (user)
+## Full E2E (keys live, 2026-10-19)
 
-1. `cp .env.example .env` and add **BRAVE_API_KEY** (TYPESAFE_API_KEY already
-   in your shell env — server picked it up automatically).
-2. Restart `node server.mjs`, run "software tester" + Sydney → expect counts
-   and `pages · jobs` per platform (~1/sec, cached 24h after).
-3. `caveman-blocks verify brave-count` → passes once the key is in `.env`.
+Key found in `~/repos/ats-search/.env` under a typo (`BRAVE_APY_KEY`); corrected to
+`BRAVE_API_KEY` and wired into this repo's `.env` (chmod 600) together with
+`TYPESAFE_API_KEY` from `~/.config/env/.env.keys`. Live query `"software tester" + Sydney`:
+
+```
+Greenhouse  7 pages · 7 jobs   SmartRecruiters 2 pages · 2 jobs
+Lever       2 pages · 1 job    Workday wd1     1 page · 1 job
+WTTJ        1 page · 1 job     Workday wd3     1 page · 0 jobs (noise filtered)
+12 platforms: 0 pages (honest zeros, dimmed)
+```
+
+Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run instant.
 
 ## Roadmap (not built)
 

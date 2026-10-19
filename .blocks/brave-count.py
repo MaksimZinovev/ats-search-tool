@@ -7,8 +7,8 @@
 # matches = ['api\.search\.brave\.com', 'braveSearch\(']
 #
 # [returns]
-# keys = ["count", "capped", "error"]
-# doc = "count = results found (up to 60); capped = true means Brave had more pages beyond 3; on failure exit 1 with error string"
+# keys = ["count", "capped"]
+# doc = "count = results found (up to 60); capped = true means Brave had more pages beyond 3; on failure exit 1 with {error: str}"
 #
 # [params]
 # q = { type = "str", required = true, help = "Full search query including site:" }
@@ -18,7 +18,7 @@
 # source = "hand: Python twin of lib.mjs braveSearch (v0 blocks are Python)"
 #
 # [stamp]
-# state = "quarantined"
+# verified = "9a79962d25d3"
 # ///
 import argparse, json, os, sys, time
 import urllib.error, urllib.parse, urllib.request

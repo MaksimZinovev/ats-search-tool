@@ -169,7 +169,7 @@ async function fetchRow(r, skipCache = false) {
           title: m.title, url: m.url,
           job: ai.scores.find((s) => s.i === i)?.job ?? null,
           rel: ai.scores.find((s) => s.i === i)?.rel ?? null,
-        }));
+        })).sort((a, b) => (b.rel ?? -1) - (a.rel ?? -1));
         r.jobs = r.matches.filter((m) => (m.job ?? 0) >= 3).length; // ≥3 on 0–4 rubric = real posting
       }
     }
@@ -198,8 +198,10 @@ function countsText(r) {
   if (r.status === "link") return "—";
   if (r.status === "dot") return "…";
   if (r.status === "err") return esc(r.err || "error");
-  const pages = r.capped ? `${r.count}+` : r.count;
-  return `${pages} pages${r.jobs != null ? ` · ${r.jobs} jobs` : ""}`;
+  const pN = r.capped ? `${r.count}+` : r.count;
+  const pW = r.capped || r.count !== 1 ? "pages" : "page";
+  const jW = r.jobs === 1 ? "job" : "jobs";
+  return `${pN} ${pW}${r.jobs != null ? ` · ${r.jobs} ${jW}` : ""}`;
 }
 function rowVal(r) { // sort value; null = keep original position
   if (r.status !== "done") return null;
