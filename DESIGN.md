@@ -26,7 +26,8 @@ Pure-white workspace, flat paper feel: depth from 1px borders and background shi
 
 ## Typography
 
-- Headings: `SF Pro Rounded` weight 500, h1 24px/1.1 `-.01em`; panel titles 12px uppercase Stone.
+- Headings: `SF Pro Rounded` weight 700, h1 30px/1.05 `-.02em` (user-directed "bolder title"; the sole weight >500 in the system, and every other heading stays ≤500); panel titles 12px uppercase Stone.
+- Header copy: three lines (`.lead` 15px ink, `.how` 13px mid, `.trust` 12px stone), each capped at 68ch; inline code (`site:`) = mono in a gray pill chip.
 - Body/UI: `ui-sans-serif` 13–14px/1.5; weights ≤500 only (no bold).
 - Data: `ui-monospace` (counts, scores, timestamps).
 
