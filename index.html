@@ -42,6 +42,7 @@
   .pbody { padding: 2px 12px 12px 26px; }
   .pname { font-weight: 600; }
   .dom { font-weight: 400; color: #8a919c; font-size: 12px; margin-left: 6px; }
+  .region { font-size: 10px; font-weight: 700; letter-spacing: .03em; background: #e8f0fe; color: #1967d2; border-radius: 4px; padding: 2px 6px; margin-left: 8px; white-space: nowrap; }
   .counts { margin-left: auto; font-family: ui-monospace, Menlo, monospace; font-size: 13px; white-space: nowrap; }
   .counts.dot { animation: pulse 1s infinite; }
   .counts.err { color: #b3261e; font-size: 12px; }
@@ -144,7 +145,7 @@
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const PLAT_KEY = "ats-platforms-v1", HIST_KEY = "ats-history-v1", CACHE_KEY = "ats-cache-v1", TTL = 24 * 3600e3;
+const PLAT_KEY = "ats-platforms-v2", HIST_KEY = "ats-history-v1", CACHE_KEY = "ats-cache-v1", TTL = 24 * 3600e3;
 
 const state = { k: "", l: "", or: false, platforms: [], rows: [], sort: "jobs", cfg: { brave: false, typesafe: false }, busy: false };
 
@@ -234,7 +235,7 @@ async function search() {
   state.busy = true; $("#searchBtn").disabled = true;
   state.rows = state.platforms.filter((p) => !p.hidden).map((p) => {
     const q = buildQuery(p.domain, k, state.l, state.or);
-    return { id: p.id, name: p.name, domain: p.domain, query: q, bUrl: braveUrl(q), gUrl: googleUrl(q),
+    return { id: p.id, name: p.name, domain: p.domain, region: p.region || "", query: q, bUrl: braveUrl(q), gUrl: googleUrl(q),
       status: "link", count: null, capped: null, jobs: null, matches: [], err: null };
   });
   renderRows(); pushHistory();
@@ -303,7 +304,7 @@ function renderRows() {
   $("#rows").innerHTML = state.rows.length ? rows.map((r) => `
     <details class="prow ${r.status === "done" && !r.count ? "zero" : ""}" data-pid="${esc(r.id)}" ${open.has(r.id) ? "open" : ""}>
       <summary>
-        <span class="pname">${esc(r.name)}<span class="dom">${esc(r.domain)}</span></span>
+        <span class="pname">${esc(r.name)}<span class="dom">${esc(r.domain)}</span>${r.region ? `<span class="region">${esc(r.region)}</span>` : ""}</span>
         <span class="counts ${r.status}">${pagesText(r)}</span>
         <span class="counts ${r.status}">${jobsText(r)}</span>
         <span class="links">
@@ -337,7 +338,7 @@ function renderPlatforms() {
   $("#platList").innerHTML = state.platforms.map((p, i) => `
     <div class="plat">
       <input type="checkbox" data-pi="${i}" data-f="hidden" ${p.hidden ? "" : "checked"} title="visible in search">
-      <input type="text" data-pi="${i}" data-f="name" value="${esc(p.name)}" title="name">
+      <span style="display:flex;gap:6px;align-items:center;min-width:0"><input type="text" data-pi="${i}" data-f="name" value="${esc(p.name)}" title="name" style="flex:1;min-width:0">${p.region ? `<span class="region">${esc(p.region)}</span>` : ""}</span>
       <input type="text" data-pi="${i}" data-f="domain" value="${esc(p.domain)}" title="domain">
       <button data-pi="${i}" data-f="del" title="remove">✕</button>
     </div>`).join("");
@@ -396,12 +397,12 @@ $("#platList").addEventListener("click", (e) => {
 $("#padd").addEventListener("click", () => {
   const d = $("#pd").value.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   if (!d) return;
-  state.platforms.push({ id: "c" + Date.now(), name: $("#pn").value.trim() || d, domain: d, builtin: false, custom: true, hidden: false });
+  state.platforms.push({ id: "c" + Date.now(), name: $("#pn").value.trim() || d, domain: d, region: "", builtin: false, custom: true, hidden: false });
   $("#pn").value = $("#pd").value = "";
   savePlatforms(); renderPlatforms();
 });
 $("#restoreBtn").addEventListener("click", async () => {
-  if (!confirm("Reset platforms to the 18 defaults? Custom entries will be removed.")) return;
+  if (!confirm("Reset platforms to the built-in defaults? Custom entries will be removed.")) return;
   state.platforms = await fetch("/api/platforms").then((r) => r.json());
   savePlatforms(); renderPlatforms();
 });

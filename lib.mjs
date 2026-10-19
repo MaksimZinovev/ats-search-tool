@@ -21,7 +21,20 @@ export const PLATFORMS = [
   ["breezy", "Breezy", "jobs.breezy.hr"],
   ["pinpoint", "Pinpoint", "jobs.pinpointhq.com"],
   ["homerun", "Homerun", "apply.homerun.co"],
-].map(([id, name, domain]) => ({ id, name, domain, builtin: true, hidden: false }));
+  // AU region — obscure direct-employer sources (state gov, PageUp unis, local ATSs).
+  // Vetted empirically: Brave-indexed per-posting pages; verify-pass fetchability noted in PROGRESS.md.
+  ["qldgov", "QLD Gov Jobs", "smartjobs.qld.gov.au", "AU · QLD"],
+  ["nswgov", "NSW Gov Jobs", "iworkfor.nsw.gov.au", "AU · NSW"],
+  ["wagov", "WA Gov Jobs", "jobs.wa.gov.au", "AU · WA"],
+  ["tasgov", "TAS Gov Jobs", "jobs.tas.gov.au", "AU · TAS"],
+  ["ntgov", "NT Gov Jobs", "jobs.nt.gov.au", "AU · NT"],
+  ["unimelb", "UniMelb", "jobs.unimelb.edu.au", "AU · VIC"],
+  ["unsw", "UNSW", "external-careers.jobs.unsw.edu.au", "AU · NSW"],
+  ["anu", "ANU", "jobs.anu.edu.au", "AU · ACT"],
+  ["livehire", "LiveHire", "livehire.com", "AU"],
+  ["employmenthero", "Employment Hero", "employmenthero.com", "AU"],
+  ["ethicaljobs", "EthicalJobs", "ethicaljobs.com.au", "AU"],
+].map(([id, name, domain, region]) => ({ id, name, domain, region: region || "", builtin: true, hidden: false }));
 
 export function buildQuery(domain, keywords, location, orMode) {
   const kw = (keywords || "").trim();

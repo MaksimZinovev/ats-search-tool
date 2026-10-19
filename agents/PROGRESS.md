@@ -85,3 +85,11 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 - Ground truth = greenhouse public JSON API (boards-api.../v1/boards/<co>/jobs; job LIST endpoint works, unblocked): all 6 Brave "Sydney" greenhouse postings GENUINELY dead (ids absent from live lists; churn is high — Brave serves stale ATS postings for weeks).
 - Built two layers: (1) deterministic id-loss redirect check server-side (posting path segment lost after fetch redirect → gone, live 0, no wasted AI) + (2) third `still` question in verify batch fed original+final URLs ("is the page still the posting, or a board/list/filled page?") → gone also from text signals, loc preserved. Blocked/unverifiable stays ✕, redirect-gone shows loc "–" + live 0.0 red + red hint line.
 - Positive control: live KnowBe4 posting (7476786002) → gone=false, loc 1 (FL vs Sydney, red), live 2.87 amber "probably open" ✓. Dead Oodle/WTTJ → gone/live 0 red ✓. E2E screenshots verified.
+
+## AU region expansion (v0.2) — user goal: expose obscure jobs big boards don't show
+- Big platforms (Seek/LinkedIn/Indeed/Jora/CareerOne/Adzuna/Gumtree) excluded by user decision; aggregator noise = the wrong location/expired chaos the tool is meant to kill.
+- Probed 24 candidate domains empirically (2 Brave probes each); verified URL shapes (per-posting vs category), verify-endpoint fetchability for each survivor.
+- Added 11 built-ins, all visible, region chips: QLD/NSW/WA/TAS/NT Gov Jobs, UniMelb (PageUp), UNSW (external-careers subdomain — the indexed one), ANU, LiveHire, Employment Hero, EthicalJobs.
+- Verify-ability map (PROG): gov boards (QLD smartjobs viewFullSingle, WA search.jobs.wa, NT JobDetails — server-rendered, loc/live scored ✓); iworkfor.nsw = Cloudflare 403, UniMelb = refuses non-browser TLS (curl 000 + node network error), LiveHire = WAF 403, UNSW = timeouts — those rows show ✕ + reason, never fake scores; counts still work.
+- PLAT_KEY bumped v1→v2 (auto-migration to 29 built-ins; v1 prefs dropped). Custom platforms get region "".
+- E2E: 29 rows, 11 chips, gov/uni rows honestly 0 for "software tester" (dimmed); LiveHire expanded → 2 real postings (snippet-scored) + 403-✕ verify states. Screenshot verified.
