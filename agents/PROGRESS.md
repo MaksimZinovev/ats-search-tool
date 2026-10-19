@@ -134,3 +134,6 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 - Repo: https://github.com/MaksimZinovev/ats-search-tool (gh repo create --public --push, main -> origin/main).
 - Push safety audit on tracked tree: no key-shaped strings (config.toml keys empty, .env.example blank, PROGRESS mentions key names only); .env ignored locally and confirmed absent (404) on origin; assets = 3 UI screenshots.
 - Topics: ats, australia, brave-search, job-board, job-search, local-first.
+
+## README: "Who is it for and use cases" section (user request, concise)
+- Placed above the fold after the two hero screenshots, before What: 2-line intro + 4 bullets (Morning scan / Hidden market / Freshness check / Niche roles); kept built-features only (long-tail keyword suggester stays in Roadmap); pushed to origin.

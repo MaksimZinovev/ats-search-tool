@@ -10,6 +10,16 @@ Runs 100% locally. Only leaves your machine: search queries to Brave/TypeSafe.
 
 ![alt text](assets/screenshot_expanded.jpg)  
 
+## Who is it for and use cases
+
+Anyone job-hunting in Australia who suspects the good roles are not on Seek.
+Built around one question: what is on the employer's own board right now?
+
+- **Morning scan** — one search covers 29 boards, counts fill in live.
+- **Hidden market** — government, university and niche boards that never sync to big platforms.
+- **Freshness check** — expanding a row re-reads the actual posting pages: location, still-open, gone-flagged.
+- **Niche roles** — boolean OR mode catches jobs big boards mislocate or never list.
+
 ## What
 
 A one-page explorer for **direct-employer postings** — the obscure jobs that
