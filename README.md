@@ -82,6 +82,73 @@ Two passes, both fed by Brave results and the posting pages themselves:
 - A separate AI score for keywords vs location is deliberate: run-to-run
   variance is ±0.3–0.5; scores are a signal, not a verdict.
 
+<details>
+<summary><strong>What do you need to be able to use it?</strong></summary>
+
+Two keys in `.env` (copy `.env.example`):
+
+- `BRAVE_API_KEY` — powers the counts. Free tier: 2,000 queries/month.
+- `TYPESAFE_API_KEY` — powers the AI grading. Optional: without it you still get all platform links and raw page counts.
+
+The grading engine is **JEV**, a scoring model from TypeSafe. It is not a
+traditional LLM. It does not generate text, and it does not chat. You give it
+your question and a piece of content; it returns a graded score.
+
+A few real examples of how results get scored (search: `qa engineer, Sydney`):
+
+| Result | What JEV decides | rel · job · loc · live |
+| ------ | ---------------- | ---------------------- |
+| `boards.greenhouse.io/acme/jobs/4192` "QA Engineer, Core, Sydney" | an individual posting for an open role, strong keyword and location fit | `3.6 · 3.5 · 3.0 · 3.5` |
+| `acme.engineering/how-we-test` "How we test in 2025" | a blog post, not a hiring page, so it can rank pages but never counts as a job | `1.2 · 1.4 · – · 2.0` |
+| `jobs.lever.co/bravo/2201` "QA Engineer, Melbourne" | right role, wrong city, so rel scores high but loc exposes the mismatch | `3.0 · 3.4 · 1.0 · 3.2` |
+| any dead posting (page redirects to the board list) | gone-check fires first: live is forced to 0 and the row is flagged, without asking JEV | `3.5 · 4.0 · ✕ · 0.0` |
+
+Scores 0–4 per axis; 0 (poor) to 4 (strong). `rel`, `job` and the first look at
+`loc/live` come from the search snippet; expanding a row re-reads the actual
+posting pages for the full grade.
+
+**One scoring call, input and output.** The tool sends your search plus every
+result of one platform in a single request, with two questions per result. For
+`qa engineer, Sydney` and one Greenhouse result, the input is:
+
+```json
+{
+  "state": {
+    "keywords": "qa engineer",
+    "location": "Sydney",
+    "results": [{ "i": 0, "title": "QA Engineer, Core",
+      "description": "Build test automation for our retail platform. Sydney, hybrid. Posted this week." }]
+  },
+  "model": "jev-latest",
+  "questions": {
+    "job0": {
+      "type": "score",
+      "instructions": "Is `results[0]` an individual job posting page for a currently open role? Judge by its title and snippet.",
+      "criteria": ["Clearly not a job posting: blog post, category or board index…", "Probably not an individual job posting", "Unclear whether this page is an individual job posting", "Probably an individual job posting for a currently open role", "Clearly an individual job posting for a currently open role"]
+    },
+    "rel0": {
+      "type": "score",
+      "instructions": "How relevant is `results[0]` to a job seeker searching for `qa engineer`?",
+      "criteria": ["Unrelated to the searched role", "Same broad field but a different role", "Partially relevant", "Relevant match", "Strong direct match"]
+    }
+  }
+}
+```
+
+The output is only typed scores, no generated text, no reasoning to parse:
+
+```json
+{ "answers": { "job0": { "score": 4 }, "rel0": { "score": 3 } } }
+```
+
+`job0: 4` says the criteria line "Clearly an individual job posting for a
+currently open role" fits. `rel0: 3` is "Relevant match" (a core QA Engineer
+rather than, say, a Test Manager). The UI then maps each score to its color
+bucket. One call per platform scores every result's every question in
+parallel.
+
+</details>
+
 ## Structure
 
 ```text
@@ -144,71 +211,6 @@ caveman-blocks verify brave-count   # needs BRAVE_API_KEY in .env or env
 - Shareable URL state (keywords/location/sort survive reload)
 - Suggested keywords + long-tail keywords via a cheap OpenRouter LLM
 
-<details>
-<summary><strong>What do you need to be able to use it?</strong></summary>
 
-Two keys in `.env` (copy `.env.example`):
-
-- `BRAVE_API_KEY` — powers the counts. Free tier: 2,000 queries/month.
-- `TYPESAFE_API_KEY` — powers the AI grading. Optional: without it you still get all platform links and raw page counts.
-
-The grading engine is **JEV**, a scoring model from TypeSafe. It is not a
-traditional LLM. It does not generate text, and it does not chat. You give it
-your question and a piece of content; it returns a graded score.
-
-A few real examples of how results get scored (search: `qa engineer, Sydney`):
-
-| Result | What JEV decides | rel · job · loc · live |
-| ------ | ---------------- | ---------------------- |
-| `boards.greenhouse.io/acme/jobs/4192` "QA Engineer, Core, Sydney" | an individual posting for an open role, strong keyword and location fit | `3.6 · 3.5 · 3.0 · 3.5` |
-| `acme.engineering/how-we-test` "How we test in 2025" | a blog post, not a hiring page, so it can rank pages but never counts as a job | `1.2 · 1.4 · – · 2.0` |
-| `jobs.lever.co/bravo/2201` "QA Engineer, Melbourne" | right role, wrong city, so rel scores high but loc exposes the mismatch | `3.0 · 3.4 · 1.0 · 3.2` |
-| any dead posting (page redirects to the board list) | gone-check fires first: live is forced to 0 and the row is flagged, without asking JEV | `3.5 · 4.0 · ✕ · 0.0` |
-
-Scores 0–4 per axis; 0 (poor) to 4 (strong). `rel`, `job` and the first look at
-`loc/live` come from the search snippet; expanding a row re-reads the actual
-posting pages for the full grade.
-
-**One scoring call, input and output.** The tool sends your search plus every
-result of one platform in a single request, with two questions per result. For
-`qa engineer, Sydney` and one Greenhouse result, the input is:
-
-```json
-{
-  "state": {
-    "keywords": "qa engineer",
-    "location": "Sydney",
-    "results": [{ "i": 0, "title": "QA Engineer, Core",
-      "description": "Build test automation for our retail platform. Sydney, hybrid. Posted this week." }]
-  },
-  "model": "jev-latest",
-  "questions": {
-    "job0": {
-      "type": "score",
-      "instructions": "Is `results[0]` an individual job posting page for a currently open role? Judge by its title and snippet.",
-      "criteria": ["Clearly not a job posting: blog post, category or board index…", "Probably not an individual job posting", "Unclear whether this page is an individual job posting", "Probably an individual job posting for a currently open role", "Clearly an individual job posting for a currently open role"]
-    },
-    "rel0": {
-      "type": "score",
-      "instructions": "How relevant is `results[0]` to a job seeker searching for `qa engineer`?",
-      "criteria": ["Unrelated to the searched role", "Same broad field but a different role", "Partially relevant", "Relevant match", "Strong direct match"]
-    }
-  }
-}
-```
-
-The output is only typed scores — no generated text, no reasoning to parse:
-
-```json
-{ "answers": { "job0": { "score": 4 }, "rel0": { "score": 3 } } }
-```
-
-`job0: 4` says the criteria line "Clearly an individual job posting for a
-currently open role" fits. `rel0: 3` is "Relevant match" (a core QA Engineer
-rather than, say, a Test Manager). The UI then maps each score to its color
-bucket. One call per platform scores every result's every question in
-parallel.
-
-</details>
 
 Design doc: `DESIGN.md` · Product: `PRODUCT.md` · Progress: `agents/PROGRESS.md`
