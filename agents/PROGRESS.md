@@ -146,3 +146,6 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 
 ## README: collapsible "What do you need ..." prerequisites section (user draft, finalised)
 - Appended before the footer as a native <details> block: keys list, JEV explainer (scoring model, not a text LLM), 4-row scoring-examples table (individual posting / blog / wrong city / dead posting with forced live 0); pushed to origin.
+
+## README: worked input/output example inside the collapsible prerequisites block
+- Real shapes from server.mjs typesafeScores(): input = state (keywords, location, results title+snippet) + model jev-latest + per-result score questions with criteria anchors; output = answers map with plain scores; explained score -> criteria anchor -> UI color bucket; batched one call per platform noted.

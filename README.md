@@ -169,6 +169,46 @@ Scores 0–4 per axis; 0 (poor) to 4 (strong). `rel`, `job` and the first look a
 `loc/live` come from the search snippet; expanding a row re-reads the actual
 posting pages for the full grade.
 
+**One scoring call, input and output.** The tool sends your search plus every
+result of one platform in a single request, with two questions per result. For
+`qa engineer, Sydney` and one Greenhouse result, the input is:
+
+```json
+{
+  "state": {
+    "keywords": "qa engineer",
+    "location": "Sydney",
+    "results": [{ "i": 0, "title": "QA Engineer, Core",
+      "description": "Build test automation for our retail platform. Sydney, hybrid. Posted this week." }]
+  },
+  "model": "jev-latest",
+  "questions": {
+    "job0": {
+      "type": "score",
+      "instructions": "Is `results[0]` an individual job posting page for a currently open role? Judge by its title and snippet.",
+      "criteria": ["Clearly not a job posting: blog post, category or board index…", "Probably not an individual job posting", "Unclear whether this page is an individual job posting", "Probably an individual job posting for a currently open role", "Clearly an individual job posting for a currently open role"]
+    },
+    "rel0": {
+      "type": "score",
+      "instructions": "How relevant is `results[0]` to a job seeker searching for `qa engineer`?",
+      "criteria": ["Unrelated to the searched role", "Same broad field but a different role", "Partially relevant", "Relevant match", "Strong direct match"]
+    }
+  }
+}
+```
+
+The output is only typed scores — no generated text, no reasoning to parse:
+
+```json
+{ "answers": { "job0": { "score": 4 }, "rel0": { "score": 3 } } }
+```
+
+`job0: 4` says the criteria line "Clearly an individual job posting for a
+currently open role" fits. `rel0: 3` is "Relevant match" (a core QA Engineer
+rather than, say, a Test Manager). The UI then maps each score to its color
+bucket. One call per platform scores every result's every question in
+parallel.
+
 </details>
 
 Design doc: `DESIGN.md` · Product: `PRODUCT.md` · Progress: `agents/PROGRESS.md`
