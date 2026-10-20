@@ -137,3 +137,9 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 
 ## README: "Who is it for and use cases" section (user request, concise)
 - Placed above the fold after the two hero screenshots, before What: 2-line intro + 4 bullets (Morning scan / Hidden market / Freshness check / Niche roles); kept built-features only (long-tail keyword suggester stays in Roadmap); pushed to origin.
+
+## Reviewed mark: single boolean per match (user: "reviewed? Y/N", single boolean, ponytail)
+- New RW_KEY "ats-reviewed-v1" localStorage store keyed by match URL; marks survive re-searches, sort, 24h cache expiry, and ↻ refreshes (same URL marked once, everywhere it appears).
+- matchHtml gains rv checkbox cell (native input, consistent with editor checkboxes); matches table header gains ✓ column with hover tooltip; matchBody renders "n of N reviewed" hint line above the table.
+- Delegated change listener: rwSet + live counter update via targeted DOM update (no re-render).
+- E2E (quota-free, injected fake row in round-38/43): box renders, toggle stores {"url":true}, counter updates "0→1 of 3", mark persists after full renderRows() re-render; verify pass correctly ⚠-labels the fake domain fetches. Skipped (ponytail): unreviewed-only filter and clear-marks action; add when long-list drift actually annoys.

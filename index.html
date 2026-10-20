@@ -170,6 +170,9 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PLAT_KEY = "ats-platforms-v2", HIST_KEY = "ats-history-v1", CACHE_KEY = "ats-cache-v1", TTL = 24 * 3600e3;
+const RW_KEY = "ats-reviewed-v1"; // ponytail: per-browser marks; move behind an API only if sync is wanted
+const rvGet = (u) => lsGet(RW_KEY, {})[u];
+const RW_TIP = "rv: you have personally checked this posting. Stored in this browser; survives re-searches and refreshes.";
 
 const state = { k: "", l: "", or: false, platforms: [], rows: [], sort: "jobs", cfg: { brave: false, typesafe: false }, busy: false };
 
@@ -299,7 +302,7 @@ function matchHtml(m) {
   const blk = `<td class="num sc sc-blk" title="posting page could not be fetched: ${esc(m.verr || "blocked")}">✕</td>`;
   const locCell = m.verr ? blk : cell(m.loc, m.v ? locCls(m.loc) : "sc-un"); // m.v = verified from page
   const liveCell = m.verr ? blk : cell(m.live, m.v ? liveCls(m.live) : "sc-un");
-  return `<tr class="${(m.job ?? 0) < 3 ? "dim" : ""}"><td><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a></td>${cell(m.rel, scoreCls(m.rel))}${cell(m.job, scoreCls(m.job))}${locCell}${liveCell}</tr>`;
+  return `<tr class="${(m.job ?? 0) < 3 ? "dim" : ""}"><td><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a></td>${cell(m.rel, scoreCls(m.rel))}${cell(m.job, scoreCls(m.job))}${locCell}${liveCell}<td class="num"><input type="checkbox" class="rvbox" data-u="${esc(m.url)}" title="reviewed (stored in this browser)" ${rvGet(m.url) ? "checked" : ""}></td></tr>`;
 }
 function matchBody(r) {
   if (r.status !== "done") return "";
@@ -313,7 +316,10 @@ function matchBody(r) {
     if (bad.length) notes.push(`<div class="hint warn">⚠ ${bad.length} of ${n} posting pages could not be fetched (${[...new Set(bad.map((m) => m.verr))].join(", ")}), so those rows show ✕ and keep their snippet scores.</div>`);
     else if (r.matches?.some((m) => !m.v)) notes.push(`<div class="hint">loc/live above use search snippets only; expanding this row re-checks them on the actual posting pages${n > 10 ? " (top 10)" : ""}.</div>`);
   }
-  if (n) return `<table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th><th class="num" data-tip="${LOC_TIP}">loc</th><th class="num" data-tip="${LIVE_TIP}">live</th></tr></thead><tbody>${r.matches.map(matchHtml).join("")}</tbody></table>${notes.join("")}`;
+  if (n) {
+    const rvN = r.matches.filter((m) => rvGet(m.url)).length;
+    return `<div class="hint rv-line">${rvN} of ${n} reviewed</div><table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th><th class="num" data-tip="${LOC_TIP}">loc</th><th class="num" data-tip="${LIVE_TIP}">live</th><th class="num" data-tip="${RW_TIP}">✓</th></tr></thead><tbody>${r.matches.map(matchHtml).join("")}</tbody></table>${notes.join("")}`;
+  }
   if (r.count) return `<div class="hint">raw pages only; the TypeSafe key is off, so no job filtering or ranking</div>`;
   return `<div class="hint">0 results on Brave; try the G link to double-check Google</div>`;
 }
@@ -440,6 +446,18 @@ $("#histList").addEventListener("click", (e) => {
   search();
 });
 $("#histClear").addEventListener("click", () => { lsSet(HIST_KEY, []); renderHistory(); });
+document.addEventListener("change", (e) => {
+  if (!e.target.matches(".rvbox")) return;
+  const rw = lsGet(RW_KEY, {});
+  if (e.target.checked) rw[e.target.dataset.u] = true; else delete rw[e.target.dataset.u];
+  lsSet(RW_KEY, rw);
+  const det = e.target.closest("details");
+  const line = det?.querySelector(".rv-line");
+  if (line) {
+    const boxes = det.querySelectorAll(".rvbox");
+    line.textContent = `${[...boxes].filter((b) => b.checked).length} of ${boxes.length} reviewed`;
+  }
+});
 
 // ---- init ----
 (async () => {

@@ -115,6 +115,7 @@ their verify pass reports the exact failure instead of guessing.
 - Search history: last 50, click to re-run, clear
 - Sort by `pages` or `jobs` (default: jobs); open-state preserved across sorts
 - Open all in tabs (popup blockers may cap this — rows open individually)
+- Reviewed marks: an ✓ checkbox per match ("n of N reviewed" per row) stored in the browser, keyed by URL — survives re-searches and refreshes
 
 ## Why no Bing/Google totals
 
