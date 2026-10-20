@@ -144,4 +144,31 @@ caveman-blocks verify brave-count   # needs BRAVE_API_KEY in .env or env
 - Shareable URL state (keywords/location/sort survive reload)
 - Suggested keywords + long-tail keywords via a cheap OpenRouter LLM
 
+<details>
+<summary><strong>What do you need to be able to use it?</strong></summary>
+
+Two keys in `.env` (copy `.env.example`):
+
+- `BRAVE_API_KEY` — powers the counts. Free tier: 2,000 queries/month.
+- `TYPESAFE_API_KEY` — powers the AI grading. Optional: without it you still get all platform links and raw page counts.
+
+The grading engine is **JEV**, a scoring model from TypeSafe. It is not a
+traditional LLM. It does not generate text, and it does not chat. You give it
+your question and a piece of content; it returns a graded score.
+
+A few real examples of how results get scored (search: `qa engineer, Sydney`):
+
+| Result | What JEV decides | rel · job · loc · live |
+| ------ | ---------------- | ---------------------- |
+| `boards.greenhouse.io/acme/jobs/4192` "QA Engineer, Core, Sydney" | an individual posting for an open role, strong keyword and location fit | `3.6 · 3.5 · 3.0 · 3.5` |
+| `acme.engineering/how-we-test` "How we test in 2025" | a blog post, not a hiring page, so it can rank pages but never counts as a job | `1.2 · 1.4 · – · 2.0` |
+| `jobs.lever.co/bravo/2201` "QA Engineer, Melbourne" | right role, wrong city, so rel scores high but loc exposes the mismatch | `3.0 · 3.4 · 1.0 · 3.2` |
+| any dead posting (page redirects to the board list) | gone-check fires first: live is forced to 0 and the row is flagged, without asking JEV | `3.5 · 4.0 · ✕ · 0.0` |
+
+Scores 0–4 per axis; 0 (poor) to 4 (strong). `rel`, `job` and the first look at
+`loc/live` come from the search snippet; expanding a row re-reads the actual
+posting pages for the full grade.
+
+</details>
+
 Design doc: `DESIGN.md` · Product: `PRODUCT.md` · Progress: `agents/PROGRESS.md`

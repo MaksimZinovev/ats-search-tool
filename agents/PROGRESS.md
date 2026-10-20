@@ -143,3 +143,6 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 - matchHtml gains rv checkbox cell (native input, consistent with editor checkboxes); matches table header gains ✓ column with hover tooltip; matchBody renders "n of N reviewed" hint line above the table.
 - Delegated change listener: rwSet + live counter update via targeted DOM update (no re-render).
 - E2E (quota-free, injected fake row in round-38/43): box renders, toggle stores {"url":true}, counter updates "0→1 of 3", mark persists after full renderRows() re-render; verify pass correctly ⚠-labels the fake domain fetches. Skipped (ponytail): unreviewed-only filter and clear-marks action; add when long-list drift actually annoys.
+
+## README: collapsible "What do you need ..." prerequisites section (user draft, finalised)
+- Appended before the footer as a native <details> block: keys list, JEV explainer (scoring model, not a text LLM), 4-row scoring-examples table (individual posting / blog / wrong city / dead posting with forced live 0); pushed to origin.
