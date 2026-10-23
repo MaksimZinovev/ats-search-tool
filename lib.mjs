@@ -75,6 +75,47 @@ export function loadWatch(path) {
   return DEFAULT_WATCH;
 }
 
+// The boards print the fields as plain text; read them where they are, no model needed.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+export function boardMeta(content, rawTitle = "") {
+  const t = String(content || "");
+  const lines = t.split("\n").map((s) => s.trim()).filter(Boolean);
+  let loc = (t.match(/Location\n([^\n]+)/) || [])[1] || "";
+  if (!loc) {
+    const l2 = lines[1] || "";
+    if (l2 && !l2.startsWith("#") && !l2.includes(":") && l2.length <= 60) loc = l2;
+  }
+  if (!loc) {
+    const m = String(rawTitle).split(" | ")[0].match(/\bin\s+([^,|]+)$/i); // the board appends " In <place>"
+    if (m) loc = m[1].trim();
+  }
+  const d = (t.match(/Online since\n(\d{1,2})\/(\d{1,2})\/(\d{4})/) || []).slice(1);
+  let employer = "";
+  const head = t.match(/^#\s+(.+)$/m); // the title the board prints, then the employer under it
+  if (head) {
+    const next = t.slice(head.index + head[0].length).split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
+    if (next && !/^[#\-*•]/.test(next) && !next.includes(":") && !next.includes(",") && next.length <= 60) employer = next;
+  }
+  return { location: loc.trim(), employer, posted: d.length ? `${+d[1]} ${MONTHS[+d[0] - 1]}` : "" };
+}
+export function boardTitle(raw, loc) {
+  let t = String(raw || "").split(" | ")[0].trim(); // boards append their own name
+  const l = String(loc || "").split(/[,/]/)[0].trim();
+  if (l) t = t.replace(new RegExp("\\s+in\\s+" + l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "i"), "").trim();
+  return t;
+}
+// A short fingerprint of the job description: the same role on two boards has the same one,
+// two different roles with the same title do not. It is what keeps one role from swallowing another.
+export function boardFingerprint(content) {
+  const t = String(content || "");
+  const m = t.match(/#{1,3}\s*job description/i);
+  return norm((m ? t.slice(m.index + m[0].length) : t)).slice(0, 120);
+}
+export function boardKey(title, loc, fingerprint) { // one role, one row: title + place + what the page says
+  return [norm(title), norm(String(loc || "").split(/[,/]/)[0]), norm(fingerprint)].join("|");
+}
+
 export async function secondSearch(query, key, max = 10) {
   const r = await fetch("https://ollama.com/api/web_search", {
     method: "POST",
@@ -84,7 +125,11 @@ export async function secondSearch(query, key, max = 10) {
   });
   if (!r.ok) throw new Error(`second ${r.status}`);
   const j = await r.json();
-  const results = (j.results || []).map((x) => ({ title: x.title || "", url: x.url || "", content: x.content || "" }));
+  const results = (j.results || []).map((x) => {
+    const meta = boardMeta(x.content, x.title);
+    const title = boardTitle(x.title, meta.location);
+    return { title, url: x.url || "", content: x.content || "", ...meta, key: boardKey(title, meta.location, boardFingerprint(x.content)) };
+  });
   return { count: results.length, results };
 }
 
@@ -135,5 +180,21 @@ if (process.argv[1]?.endsWith("lib.mjs")) {
   // second channel: watch list falls back to the defaults, and keeps the config's shape
   assert.deepEqual(loadWatch("/nonexistent/config.json"), DEFAULT_WATCH);
   assert.equal(loadWatch("/nonexistent/config.json")[1].name, "jobflurry.com");
+  // a board page: the fields the boards print, read straight out of the text
+  const sample = "Find jobs\n\nApply now\n\n---\n\n## At a glance\n\nLocation\nSydney, New South Wales\n\nOnline since\n10/19/2026\n\n# Quality Assurance Engineer\n\nCove\n\nSydney, New South Wales\n\n## Job description\n\nCove is the operating entity for Deck2 Capital.";
+  const meta = boardMeta(sample, "Quality Assurance Engineer");
+  assert.equal(meta.location, "Sydney, New South Wales");
+  assert.equal(meta.employer, "Cove");
+  assert.equal(meta.posted, "19 Oct");
+  assert.equal(boardTitle("Quality Assurance Engineer In Sydney | TheBigJobsite.com", "Sydney / Global"), "Quality Assurance Engineer");
+  assert.equal(boardKey("Quality Assurance Engineer", "Sydney, New South Wales", "cove is the operating entity"), "quality assurance engineer|sydney|cove is the operating entity");
+  // a board page with nothing under the title: no employer, no guess
+  assert.equal(boardMeta("Editorial AI QA Engineer In Sydney | TheBigJobsite.com\n\nSydney / Global\n\n# Editorial AI QA Engineer\n\n## Job Summary\n\nWork Settings:\n").employer, "");
+  // a work-arrangement line is not an employer, and a heading is not a place
+  assert.equal(boardMeta("ICT QA Engineer In Sydney | TheBigJobsite.com\n\n## Job Description\n\nbody", "ICT QA Engineer In Sydney | TheBigJobsite.com").location, "Sydney");
+  assert.equal(boardMeta("ICT QA Engineer In Sydney | TheBigJobsite.com\n\nSydney / Global\n\n# ICT QA Engineer\n\n- Hybrid\n\n## Job Description\n\nbody").employer, "");
+  // the same role on two boards has the same fingerprint, two different roles do not
+  assert.equal(boardFingerprint("## Job Description\n\nCove is the operating entity for Deck2 Capital. Together, we buy."), boardFingerprint("## Job description\n\nCove is the operating entity for Deck2 Capital. Together, we buy."));
+  assert.notEqual(boardFingerprint("## Job Description\n\nCove is the operating entity for Deck2 Capital."), boardFingerprint("## Job Description\n\nMST is seeking an experienced Quality Assurance Engineer."));
   console.log("lib self-check OK");
 }

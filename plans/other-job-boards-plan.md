@@ -352,6 +352,14 @@ Key = normalised title + normalised location.
   "Cove · Sydney, New South Wales · posted 19 Oct" from the jobmesh copy even
   though the jobflurry copy carries neither. No wording is needed for a
   possible match, so no string is added.
+- fingerprint: the first 120 characters of the job description, normalised. It
+  is part of the key, because title and place alone are not enough: one Sydney
+  search for "Quality Assurance Engineer" brings back four different roles
+  with the same title, and only the description tells them apart. Two copies
+  of one role on two boards share the fingerprint and land on one row; two
+  different roles do not, and neither swallows the other. Measured on the
+  acceptance search: the Cove job is one row, "found on jobmesh.io jobflurry.com
+  · listed in 2 places".
 
 ### What triggers the second channel
 
