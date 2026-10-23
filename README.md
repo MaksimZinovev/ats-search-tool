@@ -90,6 +90,11 @@ Two keys in `.env` (copy `.env.example`):
 - `BRAVE_API_KEY` — powers the counts. Free tier: 2,000 queries/month.
 - `TYPESAFE_API_KEY` — powers the AI grading. Optional: without it you still get all platform links and raw page counts.
 
+A third key is optional too:
+
+- `OLLAMA_API_KEY` — powers the "Other job boards" section. Without it the
+  tool works exactly as before, and the sidebar says the boards are off.
+
 The grading engine is **JEV**, a scoring model from TypeSafe. It is not a
 traditional LLM. It does not generate text, and it does not chat. You give it
 your question and a piece of content; it returns a graded score.
@@ -173,6 +178,31 @@ LiveHire, Employment Hero and EthicalJobs, each tagged with a region chip.
 
 Some ATS hosts (NSW Jobs, LiveHire, UNSW, UniMelb) refuse scripted fetches;
 their verify pass reports the exact failure instead of guessing.
+
+## Other job boards
+
+Some postings are newer than the search engine. A role posted four days ago on
+a job board can sit there for a week before any index crawls it, and a plain
+fetch of that page is usually refused by the board's bot protection.
+
+With `OLLAMA_API_KEY` in `.env`, every search also asks four job boards —
+jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com — through a
+second search index. The results land in an "Other job boards" section below
+the platform rows:
+
+- The page text comes back with the results, so a posting behind a bot wall is
+  readable and its location and posting date can be scored.
+- The same grading that scores a platform row scores these, with no extra
+  model call and no extra tokens. The second search is a search, not a chat.
+- One role is one row, even when it is listed on three boards. The row says
+  which boards it was found on.
+- A row that is a board's copy of a posting is marked "from a board copy", and
+  a board's copy can lag the employer's own page — open the posting to check.
+- It costs nothing per search: no tokens, no model, and the results are cached
+  for 24 hours, so a repeated search asks nothing.
+
+The boards to ask are in `config.json` (gitignored) if you want to change them.
+The defaults live in `lib.mjs`.
 
 ## Features
 
