@@ -159,3 +159,67 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 - Not in this change: public board APIs (greenhouse/lever/ashby/workday/smartrecruiters, all verified keyless), the free OpenRouter grader, the per-search accounting panel.
 - Mockup feedback (round 5): copy approved as written; two changes folded in — the boards are named on screen (one chip per board with its page count, plus "found on <board>" under each role) and every background step says so in words and pulses (sidebar line, row counts, row button, section sub-line, board chips). Mockup v5 verified in a browser: sidebar tooltip now opens downwards and stays inside the column; the on-state sidebar line reads "other boards: on — 4 boards asked" so it never contradicts the results below it.
 - Mockup feedback, second pass: the visible board chips were rejected — the user wants the board names in the tooltips instead. Mockup v7: no chips; the sidebar line, the section heading, the buttons and the in-flight messages all name jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com in their hover text. The only board names on screen are the links under a role, which open the posting. Per-board page counts are dropped: the section reports roles, not pages.
+
+## Other job boards — a second search channel (2026-10-23, branch feat/other-job-boards)
+
+**The problem it solves.** A live Sydney posting existed that the tool could
+not see: Quality Assurance Engineer at Cove (the software arm of Deck2
+Capital), posted 2026-10-19. Brave had not crawled it, and every copy of it on
+a job board answers a plain `fetch` with a Cloudflare 403. The employer
+published nothing the tool searches — 29 platform domains, zero hits for the
+company name, no careers page, no apply link.
+
+**The channel.** `POST https://ollama.com/api/web_search` — a search endpoint,
+not an LLM: no model, no prompt, no tokens, nothing on the balance. The
+provider fetches the page and hands the text back, so the bot wall never
+applies. `max_results` caps at 10 with no offset, so this channel cannot
+reproduce the "60+" page counts. ~2-5 s per call.
+
+**What was built**
+- `lib.mjs`: `DEFAULT_WATCH` (jobmesh.io, jobs-au.jobflurry.com,
+  au.thebigjobsite.com, www.jobleads.com), `loadWatch()` (config.json wins,
+  the four defaults are the fallback), `secondSearch()`, and the page-text
+  readers `boardMeta` / `boardTitle` / `boardFingerprint` / `boardQuote` /
+  `boardKey`. `node lib.mjs` still prints "lib self-check OK".
+- `server.mjs`: `/api/config` gains `ollama`, `/api/watch` returns the watch
+  list, `/api/second` runs one second-index search and returns each result
+  enriched with employer, location, posting date, a quote and a cluster key.
+- `index.html`: the "Other job boards" section under the platform rows; the
+  sidebar line in its on / asking now… / off states; the "look on other
+  boards" button on every row and on the section; the `?` marker on a row the
+  boards had nothing for; score cells as `span.pill` (the old markup turned
+  them into tall lozenges on any row with more than one line); and a
+  downwards tooltip variant so the sidebar note's explanation stays inside
+  the 340px column.
+
+**De-duplication — one role, one row.** Key = normalised title + normalised
+place + a fingerprint (the first 120 characters of the job description).
+Title and place alone merged four different Sydney "Quality Assurance
+Engineer" roles into one row; the fingerprint separates them, and two copies
+of one role on two boards share it. The employer (read from the page text
+when the board prints one) splits a cluster when two copies disagree.
+
+**Measured, acceptance search "quality assurance engineer" + Sydney** (live,
+real browser, 2026-10-23):
+- 34 roles in the section, 15 of them matching Sydney, 19 dimmed (loc < 3).
+- The Cove role is row 1: rel 4.0, job 3.9, loc 4.0, live 3.2 — one row, "Cove ·
+  Sydney, New South Wales · posted 19 Oct", "found on jobmesh.io jobflurry.com ·
+  listed in 2 places".
+- 23 of the 34 roles have a title the Brave channel never returned at all.
+- All 34 board-copy rows carry a coloured loc and live.
+- 0 roles counted twice.
+- 4 new search calls per search (one per board) + 4 TypeSafe grading calls,
+  cached 24 h, so a repeat search costs 0 calls. 0 OpenRouter, 0 Ollama tokens.
+
+**The empty-row trigger is a safety net, not a main path.** Brave returns
+results for nearly every `site:` query (10 pages each, even for a nonsense
+phrase), so a platform row rarely comes back empty. It fires for a new or
+obscure platform Brave has not crawled yet; verified by driving the path
+directly — the row's counts fill from the second channel, and the `?` marker
+appears when there is nothing there.
+
+**Honest limits.** The copy a board shows can lag the employer's own page, and
+the row says so. The section reports roles, not pages, so the "60+" page count
+keeps its meaning. Two thirds of the board rows have no employer — jobflurry
+and thebigjobsite do not print one — so each row quotes the posting's own
+first words instead of guessing a field.

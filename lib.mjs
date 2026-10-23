@@ -107,12 +107,25 @@ export function boardTitle(raw, loc) {
   if (l) t = t.replace(new RegExp("\\s+in\\s+" + l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "i"), "").trim();
   return t;
 }
+// The words of the posting itself: what the page says after its job-description heading.
+function boardBody(content) {
+  const t = String(content || "");
+  const m = t.match(/#{1,3}\s*job description/i);
+  return (m ? t.slice(m.index + m[0].length) : t).replace(/\s+/g, " ").trim();
+}
 // A short fingerprint of the job description: the same role on two boards has the same one,
 // two different roles with the same title do not. It is what keeps one role from swallowing another.
 export function boardFingerprint(content) {
-  const t = String(content || "");
-  const m = t.match(/#{1,3}\s*job description/i);
-  return norm((m ? t.slice(m.index + m[0].length) : t)).slice(0, 120);
+  return norm(boardBody(content)).slice(0, 120);
+}
+// A board row with no employer still has to say what it is: the posting's own first words,
+// cut at a word boundary. It quotes the page, so it cannot be wrong.
+export function boardQuote(content, chars = 90) {
+  const body = boardBody(content);
+  if (body.length <= chars) return body;
+  const cut = body.slice(0, chars);
+  const i = cut.lastIndexOf(" ");
+  return (i > 20 ? cut.slice(0, i) : cut).replace(/[,;:.\-]+$/, "") + "…";
 }
 export function boardKey(title, loc, fingerprint) { // one role, one row: title + place + what the page says
   return [norm(title), norm(String(loc || "").split(/[,/]/)[0]), norm(fingerprint)].join("|");
@@ -130,7 +143,7 @@ export async function secondSearch(query, key, max = 10) {
   const results = (j.results || []).map((x) => {
     const meta = boardMeta(x.content, x.title);
     const title = boardTitle(x.title, meta.location);
-    return { title, url: x.url || "", content: x.content || "", ...meta, key: boardKey(title, meta.location, boardFingerprint(x.content)) };
+    return { title, url: x.url || "", content: x.content || "", ...meta, quote: boardQuote(x.content), key: boardKey(title, meta.location, boardFingerprint(x.content)) };
   });
   return { count: results.length, results };
 }
@@ -200,5 +213,8 @@ if (process.argv[1]?.endsWith("lib.mjs")) {
   // the same role on two boards has the same fingerprint, two different roles do not
   assert.equal(boardFingerprint("## Job Description\n\nCove is the operating entity for Deck2 Capital. Together, we buy."), boardFingerprint("## Job description\n\nCove is the operating entity for Deck2 Capital. Together, we buy."));
   assert.notEqual(boardFingerprint("## Job Description\n\nCove is the operating entity for Deck2 Capital."), boardFingerprint("## Job Description\n\nMST is seeking an experienced Quality Assurance Engineer."));
+  // a row with no employer still quotes the posting itself
+  assert.equal(boardQuote("## Job Description\n\nWe are seeking an experienced Quality Assurance Engineer to help ensure the quality, reliability and release readiness of MST's platforms."), "We are seeking an experienced Quality Assurance Engineer to help ensure the quality…");
+  assert.equal(boardQuote("## Job Description\n\nShort body."), "Short body.");
   console.log("lib self-check OK");
 }
