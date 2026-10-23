@@ -236,9 +236,10 @@ Every user-visible string this change adds.
 | Sidebar line, channel off | other boards: off — add an API key to include them | Without this, jobs posted in the last few days can be missing. Add an API key and we ask jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com for the same search. |
 | Sidebar line, working | other boards: asking now… | Asking jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com now. |
 | Section heading | Other job boards | The other job boards we ask for every search: jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com. |
-| Section sub-line | 3 roles found | — (or "off — no API key", or "asking now…") |
+| Section sub-line | 34 roles found · 15 match Sydney | — (or "off — no API key", or "asking now…"; the "match" half appears only when a place was searched and some roles are elsewhere) |
 | Match marker | from a board copy | — |
 | Sources under a match | found on jobmesh.io jobflurry.com · listed in 2 places | — |
+| Under a match, when the board prints no employer | the posting's own first words, e.g. Cove is the operating entity for Deck2 Capital. Together, we acquire and operate good… | — (a quote, not a guess: two thirds of the board copies print no employer, and the title alone does not tell two roles apart) |
 | Row button | look on other boards | Asks the other job boards for results this search missed. |
 | Section button | look on other boards ↻ | Asks the other job boards for results this search missed. Free, and repeated searches are cached. |
 | Row button, working | looking… | — (dashed border, pulsing) |
@@ -405,24 +406,45 @@ section.
 Run the same three searches before and after: "qa engineer" with Sydney,
 "product designer" with Sydney, "software tester" with remote.
 
-| Measure | Before | Target |
+| Measure | Before | Measured after |
 |---|---|---|
-| Roles found that the Brave channel missed | 0 | 3 or more on the Sydney QA search |
-| Board-copy rows with coloured location and freshness | 0 | every board-copy row |
-| Roles counted twice | n/a | 0 |
-| LLM tokens spent per search | unchanged | unchanged |
-| New calls per search | 0 | 4 board searches plus one per empty platform row, cached for 24 hours |
+| Roles found that the Brave channel missed | 0 | 22 of the 24 board role titles were never returned by Brave, on the acceptance search. Brave returned 102 distinct titles across the 29 platform domains; the four boards added 24 more. |
+| Board-copy rows with coloured location and freshness | 0 | every board-copy row (the description is the page, not a snippet) |
+| Roles counted twice | n/a | 0 — the Cove role is one row, "found on jobmesh.io jobflurry.com · listed in 2 places" |
+| LLM tokens spent per search | unchanged | unchanged — 0 OpenRouter calls, 0 Ollama tokens |
+| New calls per search | 0 | 4 board searches (2.5–3.0 s for all four), plus one per empty platform row, cached for 24 hours |
+| The section is a wall of noise | n/a | 34 roles, 15 of them match the place searched, 19 dimmed but not hidden; the rest of the search is untouched |
+
+The three comparison searches all return on-topic roles: "qa engineer" with
+Sydney gives 40 results in 37 clusters, "product designer" with Sydney 40 in
+39, "software tester" with remote 40 in 38 — and the remote search returns
+remote roles ("Automation Tester", "Remote Senior AI/ML Quality Assurance
+Engineer").
 
 The acceptance case is the one that started this: a Quality Assurance Engineer
 role in Sydney posted on 2026-10-19, visible on a job board, invisible to the
 tool. After this change it must appear in the "Other job boards" section, with
 its location and freshness scored, counted once, with every board copy listed
-under it.
+under it. Measured: row 1 of the section, rel 4.0, job 3.9, loc 4.0, live 3.3,
+"Cove · Sydney, New South Wales · posted 19 Oct".
 
 The employer behind that role has no ATS posting and no careers page, so the
 board copies are the whole story for it. The employer's own posting is listed
 alongside them when one exists; for this role there is none, and that is not a
 failure of the feature.
+
+### What this cannot promise
+
+- A posting that **neither** index has crawled stays invisible. Two indexes are
+  a wide net, not a guarantee.
+- The empty-row trigger rarely fires. Brave returns 10 pages for nearly every
+  `site:` query, even a nonsense phrase, so a platform row rarely comes back
+  empty. It is a safety net for a new or obscure platform Brave has not crawled
+  yet, not a main path. Verified by driving it directly: the row's counts fill
+  from the second channel and the `?` marker appears when there is nothing
+  there.
+- A board copy can lag the employer's own page, and the row says so. The
+  employer rule is unchanged: an employer posting is listed when one exists.
 
 ## Not in this change
 
