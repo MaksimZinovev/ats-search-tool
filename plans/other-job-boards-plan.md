@@ -121,6 +121,56 @@ forward-referencing, no internal vocabulary.
 | Q21 | Off-state note | **other boards: off — add an API key to include them** | "extra job boards are switched off" (no next step), "coverage: main boards only" (a limitation, not a setting) |
 | Q22 | Config file name | **`config.json`** | "sources.json" (has to grow), "job-boards.json" (over-promises, it will also hold model settings) |
 
+### Round 5 — feedback on the mockup
+
+The copy in round 4 was approved as written ("looks good"). Two changes came
+back from reviewing the mockup.
+
+| # | Feedback | Decision |
+|---|---|---|
+| Q23 | "be explicit: include other job board names" | The boards are named on screen, not implied by a generic heading. Each board gets a chip with its own page count, and each role lists the boards it was found on. The heading stays "Other job boards"; the names sit directly under it |
+| Q24 | "please ensure there is user-facing clear visual feedback when background process that matter for them is working" | Every place the tool is working in the background says so in words and pulses while it runs. A silent wait is not acceptable |
+
+Q23 in detail. The section shows one chip per board:
+
+```
+jobmesh.io 8 pages    jobflurry.com 2 pages    thebigjobsite.com 0 pages    jobleads.com 0 pages
+```
+
+and each role names its sources:
+
+```
+found on  jobmesh.io  jobflurry.com  · listed in 2 places
+```
+
+The chips also answer "did the tool actually ask that board", which matters when
+a board returns nothing.
+
+Q24 in detail. Five surfaces show that work is running, each with a word and a
+pulse, never a spinner the user has to interpret:
+
+| Surface | In flight | Settled |
+|---|---|---|
+| Sidebar line | other boards: looking on 4 boards now… | other boards: on — 4 boards asked |
+| Platform row counts | pulsing … | 0 pages / 0 jobs, dimmed |
+| Platform row button | looking… | look on other boards |
+| Section sub-line | looking on 4 boards… | 3 roles · asked 4 boards |
+| Board chips | looking… | jobmesh.io 8 pages |
+
+The row body also says "asking the other job boards for this one…", and the
+section says "matching each role to the jobs you searched for, results appear
+here as they arrive" so a partial result set is never mistaken for a finished
+one.
+
+Two placement rules came out of rendering the mockup in a browser:
+
+- The tooltip in the sidebar opens downwards and stays inside the sidebar
+  column. The existing rule opens upwards, which put the explanation over the
+  Search button; a downwards variant is needed.
+- The tooltip rides on the whole note line, not on the small marker inside it.
+  A tooltip anchored to a 15px marker at the end of the line opens outside the
+  column.
+
 ## The design
 
 ```
@@ -174,11 +224,18 @@ Every user-visible string this change adds.
 
 | Where | String | Hover explanation |
 |---|---|---|
-| Sidebar note | other boards: off — add an API key to include them | Without this, jobs posted in the last few days can be missing. Add an API key and we ask a second set of job boards for the same search. |
-| Section heading | Other job boards | — (sub-line: "3 roles found in 2 places") |
+| Sidebar line, channel on | other boards: on — 4 boards asked | We ask these job boards for the same search. Jobs posted in the last few days often show up here first, before the main search has caught up. |
+| Sidebar line, channel off | other boards: off — add an API key to include them | Without this, jobs posted in the last few days can be missing. Add an API key and we ask a second set of job boards for the same search. |
+| Sidebar line, working | other boards: looking on 4 boards now… | — |
+| Section heading | Other job boards | — (sub-line: "3 roles · asked 4 boards", or "off — no API key", or "looking on 4 boards…") |
+| Board chip | jobmesh.io 8 pages | — (one chip per board, including the ones that found nothing) |
 | Match marker | from a board copy | — |
+| Sources under a match | found on jobmesh.io jobflurry.com · listed in 2 places | — |
 | Row button | look on other boards | Asks the other job boards for results this search missed. |
 | Section button | look on other boards ↻ | Asks the other job boards for results this search missed. Free, and repeated searches are cached. |
+| Row button, working | looking… | — (dashed border, pulsing) |
+| Row body, working | asking the other job boards for this one… | — |
+| Section, working | matching each role to the jobs you searched for, results appear here as they arrive. | — |
 | Skipped-row marker | ? | We could not ask the other job boards for this one, no API key. / We asked the other job boards for this one. Nothing there either, this role may not be published yet. |
 | Section footnote | — | The copy a job board shows can lag the employer's own page. Open the posting to confirm the role is still open. |
 | Off-state section | — | These boards are off. Add an API key and this search will ask them too, that is where jobs posted in the last few days usually show up first. |
@@ -211,19 +268,25 @@ three-file shape (`index.html`, `lib.mjs`, `server.mjs`).
 ### 3. `index.html`
 
 - The "Other job boards" section, rendered below the platform rows.
+- One chip per board in the watch list, carrying the board's own page count, so
+  the user can see which boards were asked and what each one returned.
 - The "look on other boards" button on each platform row and on the section
-  heading.
-- The sidebar note and the "?" marker on rows the second channel could not
-  check.
+  heading, plus its in-flight state.
+- The sidebar line, in its on, off and working states.
+- The "?" marker on rows the second channel could not check.
 - The board-copy marker on second-channel matches, and the de-duplicated
   clusters with their source links.
+- **Background work is visible.** Five surfaces pulse and say what is happening:
+  the sidebar line, the row counts, the row button, the section sub-line and the
+  board chips. No silent waits.
 - **Score cells become pill elements.** The mockup showed the current markup
   turning score cells into tall rounded lozenges on any row with more than one
   line, which the board-copy rows always have. The number moves into a
   `span.pill` so the cell keeps its compact shape.
 - **Tooltips in the sidebar open downwards.** The existing tooltip rule opens
   upwards, which put the explanation over the Search button. A downwards variant
-  is needed for the note in the sidebar.
+  is needed, and the tooltip rides on the whole note line so it stays inside the
+  sidebar column.
 
 ### 4. `config.json`
 
