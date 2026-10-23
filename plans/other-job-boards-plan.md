@@ -337,12 +337,16 @@ grader's cost scales with the prompt.
 
 ### De-duplication rule
 
-Key = normalised title + normalised location.
+Key = normalised title + normalised location + a fingerprint of the posting.
 
 - title: lowercase, drop the board's own suffix (` In Sydney |
   TheBigJobsite.com`), drop punctuation.
 - location: the first segment of the board's location text, split on `,` or
   `/` — `Sydney, New South Wales` and `Sydney / Global` both give `sydney`.
+  The boards print `place / work type` (`Sydney / Global`, `Sydney / On-site`),
+  and the second part is how the role is worked, not where it is. The row shows
+  the place only; the grader still sees the whole line, so it can tell a
+  remote role from a local one.
 - employer: read from the page text when the board prints it (jobmesh prints
   it under the title; jobflurry and thebigjobsite do not). If two copies in a
   cluster both name an employer and the names differ, they are two roles and

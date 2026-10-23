@@ -90,6 +90,8 @@ export function boardMeta(content, rawTitle = "") {
     const m = String(rawTitle).split(" | ")[0].match(/\bin\s+([^,|]+)$/i); // the board appends " In <place>"
     if (m) loc = m[1].trim();
   }
+  // the boards print "place / work type" — "Sydney / Global", "Sydney / On-site". Only the place is the place.
+  loc = loc.split("/")[0].trim();
   const d = (t.match(/Online since\n(\d{1,2})\/(\d{1,2})\/(\d{4})/) || []).slice(1);
   let employer = "";
   const head = t.match(/^#\s+(.+)$/m); // the title the board prints, then the employer under it
@@ -187,6 +189,8 @@ if (process.argv[1]?.endsWith("lib.mjs")) {
   assert.equal(meta.employer, "Cove");
   assert.equal(meta.posted, "19 Oct");
   assert.equal(boardTitle("Quality Assurance Engineer In Sydney | TheBigJobsite.com", "Sydney / Global"), "Quality Assurance Engineer");
+  // a board prints "place / work type": only the place is the place
+  assert.equal(boardMeta("Quality Assurance Engineer In Sydney | TheBigJobsite.com\n\nSydney / Global\n\n## Job Description\n\nbody").location, "Sydney");
   assert.equal(boardKey("Quality Assurance Engineer", "Sydney, New South Wales", "cove is the operating entity"), "quality assurance engineer|sydney|cove is the operating entity");
   // a board page with nothing under the title: no employer, no guess
   assert.equal(boardMeta("Editorial AI QA Engineer In Sydney | TheBigJobsite.com\n\nSydney / Global\n\n# Editorial AI QA Engineer\n\n## Job Summary\n\nWork Settings:\n").employer, "");
