@@ -307,6 +307,59 @@ The watch list, as shown above.
 joins `.env` in `.gitignore` so a local watch list can never be committed by
 accident.
 
+## Interface contract
+
+The browser owns the flow, the server owns the two search channels. The
+contract is small on purpose, so the two halves do not drift.
+
+### What the server exposes
+
+| Call | Returns |
+|---|---|
+| `GET /api/config` | `{brave, typesafe, ollama}` — `ollama` is true when a key is present |
+| `GET /api/watch` | `[{domain, name}]` — the watch list from `config.json`, e.g. `{domain:"jobs-au.jobflurry.com", name:"jobflurry.com"}`. `name` is the short form the copy uses |
+| `GET /api/second?q=<query>` | `{count, results:[{title, url, content}]}` — one second-index search. `q` is a `site:` query the browser built; `{disabled:true}` when there is no key |
+| `POST /api/ai` | unchanged — the browser grades board copies with this same call, `results[].description` = the page text |
+| `POST /api/verify` | unchanged shape, plus an optional `fallbacks: {url: text}` map |
+
+`content` is the page text the provider read. The browser sends the first
+4,000 characters of it as `description`: the fields we need (location,
+posting date, employer) sit at the top of the page, and the grader does not
+need 17,000 characters to judge a posting.
+
+### What the browser owns
+
+- Building the per-domain `site:` query (it already mirrors `buildQuery`).
+- The 24h cache: today's key, the built query string, which already contains
+  the domain.
+- De-duplication, and every "in flight" state.
+
+### De-duplication rule
+
+Key = normalised title + normalised location.
+
+- title: lowercase, drop the board's own suffix (` In Sydney |
+  TheBigJobsite.com`), drop punctuation.
+- location: the first segment of the board's location text, split on `,` or
+  `/` — `Sydney, New South Wales` and `Sydney / Global` both give `sydney`.
+- employer: read from the page text when the board prints it (jobmesh prints
+  it under the title; jobflurry and thebigjobsite do not). If two copies in a
+  cluster both name an employer and the names differ, they are two roles and
+  split into two rows. If one copy has no employer, the cluster is marked as a
+  possible match, not a certain one.
+
+### Two open points (alpha to confirm)
+
+1. **What an empty platform row triggers.** The design diagram above says
+   "second-index search for that same domain"; the frozen copy for a platform
+   row says "asking jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com
+   for this one…". The copy is the frozen artefact, so the four boards are what
+   get asked, and the hits land in the "Other job boards" section. The diagram
+   line is the outlier.
+2. **A possible-match cluster has no string.** The copy table has no wording
+   for "this cluster might be two different roles". Proposal: append
+   `· may be a different role` to the sources line, only for such clusters.
+
 ## Risks
 
 | Risk | Handling |
