@@ -450,9 +450,8 @@ function clusterBoards(items) {
     out.push(...list);
   }
   const best = (list, k) => { const v = list.map((i) => i[k]).filter((x) => x != null); return v.length ? Math.max(...v) : null; };
-  // all-green rows first, then the roles in the searched place, then the best total
-  const allGreen = (c) => [c.rel, c.job, c.loc, c.live].every((v) => v != null && v >= 3);
-  const total = (c) => [c.rel, c.job, c.loc, c.live].reduce((a, v) => a + (v ?? 0), 0);
+  // green-first, then left-to-right by score columns (rel, job, loc, live)
+  const greenCount = (c) => [c.rel, c.job, c.loc, c.live].filter((v) => v != null && v >= 3).length;
   return out.map((b) => {
     const rich = b.items.find((x) => x.employer && x.posted) || b.items.find((x) => x.employer) || b.items.find((x) => x.posted) || b.items[0];
     return {
@@ -462,7 +461,7 @@ function clusterBoards(items) {
       // did the posting survive? the copy in the search index can be older than the posting
       check: b.items.find((x) => x.check === "gone") ? "gone" : b.items.find((x) => x.check === "live") ? "live" : b.items.find((x) => x.check) ? "unknown" : "",
     };
-  }).sort((a, b) => (allGreen(b) - allGreen(a)) || ((b.loc ?? -1) >= 3) - ((a.loc ?? -1) >= 3) || (total(b) - total(a)) || (b.rel ?? -1) - (a.rel ?? -1) || (b.live ?? -1) - (a.live ?? -1));
+  }).sort((a, b) => (greenCount(b) - greenCount(a)) || (b.rel ?? -1) - (a.rel ?? -1) || (b.job ?? -1) - (a.job ?? -1) || (b.loc ?? -1) - (a.loc ?? -1) || (b.live ?? -1) - (a.live ?? -1));
 }
 
 // Ask the other boards for this search. They are asked on every search; each one lands as it arrives.
