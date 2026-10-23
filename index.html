@@ -319,28 +319,36 @@ const scoreCls = (v) => (v >= 3 ? "sc-hi" : v >= 2 ? "sc-mid" : "sc-lo");
 const locCls = (v) => (v === 0 ? "sc-un" : scoreCls(v)); // 0 = "unknown" → muted, not alarm-red
 const liveCls = (v) => (v >= 1.5 && v < 2.5 ? "sc-un" : scoreCls(v)); // ≈2 "unclear" → muted, real signals get colour
 
-function matchHtml(m) {
+function matchHtml(m, boards) {
   const cell = (v, cls) => `<td class="num"><span class="pill ${v != null ? cls : "sc-un"}">${v != null ? v.toFixed(1) : "–"}</span></td>`;
   const blk = `<td class="num sc-blk" title="posting page could not be fetched: ${esc(m.verr || "blocked")}">✕</td>`;
-  const locCell = m.verr ? blk : cell(m.loc, m.v ? locCls(m.loc) : "sc-un"); // m.v = verified from page
-  const liveCell = m.verr ? blk : cell(m.live, m.v ? liveCls(m.live) : "sc-un");
+  const bc = boards?.get(m.url); // the same posting, read through the board copy
+  const fromBoard = (v, cls) => `<td class="num" title="location and freshness scored from the board copy of this posting"><span class="pill ${cls}">${v.toFixed(1)}</span></td>`;
+  // a board copy read the whole posting, so its scores beat a snippet score and a blocked fetch
+  const locCell = bc && bc.loc != null ? fromBoard(bc.loc, locCls(bc.loc)) : m.verr ? blk : cell(m.loc, m.v ? locCls(m.loc) : "sc-un"); // m.v = verified from page
+  const liveCell = bc && bc.live != null ? fromBoard(bc.live, liveCls(bc.live)) : m.verr ? blk : cell(m.live, m.v ? liveCls(m.live) : "sc-un");
   return `<tr class="${(m.job ?? 0) < 3 ? "dim" : ""}"><td><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a></td>${cell(m.rel, scoreCls(m.rel))}${cell(m.job, scoreCls(m.job))}${locCell}${liveCell}<td class="num"><input type="checkbox" class="rvbox" data-u="${esc(m.url)}" title="reviewed (stored in this browser)" ${rvGet(m.url) ? "checked" : ""}></td></tr>`;
 }
 function matchBody(r) {
   if (r.status !== "done") return "";
   const n = r.matches?.length || 0;
+  const boards = new Map((state.boards.items || []).map((b) => [b.url, b])); // the same posting, seen through a board
   const notes = [];
   if (r.vbusy) notes.push(`<div class="hint vbusy">fetching posting pages, verifying loc/live…</div>`);
   else {
     const goneN = r.matches?.filter((m) => m.gone).length || 0;
     if (goneN) notes.push(`<div class="hint warn">⚠ ${goneN} of ${n} postings no longer exist: the page redirects to a board list, or states the role is no longer open. Live is forced to 0.</div>`);
     const bad = r.matches?.filter((m) => m.verr) || [];
-    if (bad.length) notes.push(`<div class="hint warn">⚠ ${bad.length} of ${n} posting pages could not be fetched (${[...new Set(bad.map((m) => m.verr))].join(", ")}), so those rows show ✕ and keep their snippet scores.</div>`);
-    else if (r.matches?.some((m) => !m.v)) notes.push(`<div class="hint">loc/live above use search snippets only; expanding this row re-checks them on the actual posting pages${n > 10 ? " (top 10)" : ""}.</div>`);
+    const mirrored = r.matches?.filter((m) => boards.get(m.url)?.loc != null).length || 0;
+    if (bad.length) {
+      const left = bad.length - mirrored;
+      notes.push(`<div class="hint warn">⚠ ${bad.length} of ${n} posting pages could not be fetched (${[...new Set(bad.map((m) => m.verr))].join(", ")}).${mirrored ? ` ${mirrored} took their location and freshness from the board copy instead.` : ""}${left ? ` ${left} show ✕ and keep their snippet scores.` : ""}</div>`);
+    }
+    else if (r.matches?.some((m) => !m.v)) notes.push(`<div class="hint">loc/live above use search snippets only; expanding this row re-checks them on the actual posting pages${n > 10 ? " (top 10)" : ""}.${mirrored ? ` ${mirrored} took theirs from the board copy instead.` : ""}</div>`);
   }
   if (n) {
     const rvN = r.matches.filter((m) => rvGet(m.url)).length;
-    return `<div class="hint rv-line">${rvN} of ${n} reviewed</div><table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th><th class="num" data-tip="${LOC_TIP}">loc</th><th class="num" data-tip="${LIVE_TIP}">live</th><th class="num" data-tip="${RW_TIP}">✓</th></tr></thead><tbody>${r.matches.map(matchHtml).join("")}</tbody></table>${notes.join("")}`;
+    return `<div class="hint rv-line">${rvN} of ${n} reviewed</div><table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th><th class="num" data-tip="${LOC_TIP}">loc</th><th class="num" data-tip="${LIVE_TIP}">live</th><th class="num" data-tip="${RW_TIP}">✓</th></tr></thead><tbody>${r.matches.map((m) => matchHtml(m, boards)).join("")}</tbody></table>${notes.join("")}`;
   }
   if (r.count) return `<div class="hint">raw pages only; the TypeSafe key is off, so no job filtering or ranking</div>`;
   return `<div class="hint">0 results on Brave; try the G link to double-check Google</div>`;
@@ -468,6 +476,7 @@ async function runBoards(fresh = false) {
       const items = await secondResults(q, w, fresh);
       state.boards.items.push(...items);
       renderBoards();
+      renderRows(); // a platform row can now take its location and freshness from a board copy
     } catch { /* one board down does not stop the others */ }
   }));
   state.boards.status = "on";

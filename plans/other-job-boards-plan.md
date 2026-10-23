@@ -366,6 +366,15 @@ Key = normalised title + normalised location + a fingerprint of the posting.
   acceptance search: the Cove job is one row, "found on jobmesh.io jobflurry.com
   · listed in 2 places".
 
+### The same posting in two places
+
+A posting can be in a platform row and in the "Other job boards" section at
+once — the same URL, the same job. When that happens, the board copy's
+location and freshness fill the platform row's cells. A board copy read the
+whole posting, so its score beats a search-snippet score and a blocked fetch
+(the ✕ that jobmesh gives us). The cell says where the numbers came from, so
+the row never implies the platform's own page was fetched.
+
 ### What triggers the second channel
 
 Two mechanisms, two different jobs. Both are one `GET /api/second?q=site:DOMAIN …`
