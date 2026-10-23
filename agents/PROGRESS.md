@@ -205,7 +205,7 @@ real browser, 2026-10-23):
 - The Cove role is row 1: rel 4.0, job 3.9, loc 4.0, live 3.2 — one row, "Cove ·
   Sydney, New South Wales · posted 19 Oct", "found on jobmesh.io jobflurry.com ·
   listed in 2 places".
-- 23 of the 34 roles have a title the Brave channel never returned at all.
+- 24 of the 34 roles carry a title the Brave channel never returned at all (22 of the 24 distinct titles among them). Brave returned 102 distinct titles across the 29 platform domains.
 - All 34 board-copy rows carry a coloured loc and live.
 - 0 roles counted twice.
 - 4 new search calls per search (one per board) + 4 TypeSafe grading calls,

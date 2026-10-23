@@ -408,7 +408,7 @@ Run the same three searches before and after: "qa engineer" with Sydney,
 
 | Measure | Before | Measured after |
 |---|---|---|
-| Roles found that the Brave channel missed | 0 | 22 of the 24 board role titles were never returned by Brave, on the acceptance search. Brave returned 102 distinct titles across the 29 platform domains; the four boards added 24 more. |
+| Roles found that the Brave channel missed | 0 | 24 of the 34 roles carry a title the Brave channel never returned at all (22 of the 24 distinct titles among them). Brave returned 102 distinct titles across the 29 platform domains; the four boards added 24 more. |
 | Board-copy rows with coloured location and freshness | 0 | every board-copy row (the description is the page, not a snippet) |
 | Roles counted twice | n/a | 0 — the Cove role is one row, "found on jobmesh.io jobflurry.com · listed in 2 places" |
 | LLM tokens spent per search | unchanged | unchanged — 0 OpenRouter calls, 0 Ollama tokens |
