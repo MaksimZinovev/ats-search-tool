@@ -48,6 +48,7 @@
   .grid-header span:nth-child(2), .grid-header span:nth-child(3), .prow summary .counts { text-align: right; }
   .grid-header [data-tip] { margin-left: 0; }
   .prow { border-bottom: 1px solid var(--line); }
+  .prow.boards summary { grid-template-columns: minmax(160px, 1fr) 90px 130px minmax(140px, auto); } /* the second count says how many match the place */
   .prow summary { cursor: pointer; list-style: none; position: relative; padding-left: 28px; }
   .prow summary::-webkit-details-marker { display: none; }
   .prow summary::before { content: "▸"; position: absolute; left: 12px; color: var(--silver); }
@@ -100,11 +101,6 @@
   .qmark { display: inline-block; width: 15px; height: 15px; line-height: 14px; text-align: center; border: 1px dashed var(--line2); border-radius: 9999px; color: var(--stone); font-size: 10px; }
   .btn-sm { padding: 3px 11px; font-size: 11px; color: var(--text); }
   .btn-busy { border-style: dashed; animation: pulse 1s infinite; }
-  .sec { margin-top: 6px; }
-  .sec-head { display: flex; align-items: baseline; gap: 10px; padding: 12px 12px 8px 28px; }
-  .sec-head h2 { margin: 0; }
-  .sec-sub { font-size: 11px; color: var(--silver); }
-  .sec-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
   .badge { display: inline-block; font-size: 11px; color: var(--stone); border: 1px solid var(--line2); border-radius: 9999px; padding: 1px 8px; white-space: nowrap; }
   .meta { font-size: 11px; color: var(--stone); margin-top: 2px; }
   .quote { font-size: 11px; color: var(--silver); margin-top: 2px; }
@@ -179,7 +175,7 @@
     </div>
     <div class="grid-header"><span>platform</span><span data-tip="pages = results found on this platform (Brave site: search; exact up to 60, 60+ means more). Click a platform row to expand it.">pages</span><span data-tip="jobs = results that scored 3+ on the is-it-real scale. Expand a platform for ranked matches with rel/job/loc/live; loc and live get re-scored from the actual posting pages when you expand.">jobs</span><span></span></div>
     <div id="rows"><div id="empty">Enter keywords and click Search. Links appear instantly; counts fill in per platform at about one per second.</div></div>
-    <div class="sec" id="boards"></div>
+    <div id="boards"></div>
   </section>
 </main>
 <footer>Runs locally; nothing leaves this machine except the search queries sent to Brave and TypeSafe. No accounts; your API keys and history stay here. The free tier covers 2,000 Brave queries a month, about 1 to 3 per platform.</footer>
@@ -194,7 +190,7 @@ const RW_KEY = "ats-reviewed-v1"; // ponytail: per-browser marks; move behind an
 const rvGet = (u) => lsGet(RW_KEY, {})[u];
 const RW_TIP = "rv: you have personally checked this posting. Stored in this browser; survives re-searches and refreshes.";
 
-const state = { k: "", l: "", or: false, platforms: [], rows: [], sort: "jobs", cfg: { brave: false, typesafe: false, ollama: false }, busy: false, watch: [], watchReady: null, boards: { status: "off", items: [] } };
+const state = { k: "", l: "", or: false, platforms: [], rows: [], sort: "jobs", cfg: { brave: false, typesafe: false, ollama: false }, busy: false, watch: [], watchReady: null, boards: { status: "off", items: [] }, boardsOpen: true };
 
 const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -453,6 +449,9 @@ function clusterBoards(items) {
     out.push(...list);
   }
   const best = (list, k) => { const v = list.map((i) => i[k]).filter((x) => x != null); return v.length ? Math.max(...v) : null; };
+  // all-green rows first, then the roles in the searched place, then the best total
+  const allGreen = (c) => [c.rel, c.job, c.loc, c.live].every((v) => v != null && v >= 3);
+  const total = (c) => [c.rel, c.job, c.loc, c.live].reduce((a, v) => a + (v ?? 0), 0);
   return out.map((b) => {
     const rich = b.items.find((x) => x.employer && x.posted) || b.items.find((x) => x.employer) || b.items.find((x) => x.posted) || b.items[0];
     return {
@@ -460,7 +459,7 @@ function clusterBoards(items) {
       quote: rich.quote || b.items[0].quote || "",
       items: b.items, rel: best(b.items, "rel"), job: best(b.items, "job"), loc: best(b.items, "loc"), live: best(b.items, "live"),
     };
-  }).sort((a, b) => ((b.loc ?? -1) >= 3) - ((a.loc ?? -1) >= 3) || (b.rel ?? -1) - (a.rel ?? -1) || (b.live ?? -1) - (a.live ?? -1)); // the roles in the searched place first, then the best match, then the freshest
+  }).sort((a, b) => (allGreen(b) - allGreen(a)) || ((b.loc ?? -1) >= 3) - ((a.loc ?? -1) >= 3) || (total(b) - total(a)) || (b.rel ?? -1) - (a.rel ?? -1) || (b.live ?? -1) - (a.live ?? -1));
 }
 
 // Ask the other boards for this search. They are asked on every search; each one lands as it arrives.
@@ -468,17 +467,22 @@ async function runBoards(fresh = false) {
   const watch = state.watch.length ? state.watch : await (state.watchReady || Promise.resolve([])); // a search can start before the list is in
   if (!state.cfg.ollama || !watch.length) { state.boards.items = []; state.boards.status = "off"; renderBoardsNote(); renderBoards(); return; }
   state.boards.status = "asking";
-  state.boards.items = [];
+  state.boards.failed = 0;
+  const prev = new Map(); // a board that does not answer keeps the roles it gave us last time
+  for (const it of state.boards.items) { if (!prev.has(it.domain)) prev.set(it.domain, []); prev.get(it.domain).push(it); }
   renderBoardsNote(); renderBoards();
+  const got = new Map();
   await Promise.all(watch.map(async (w) => {
     const q = buildQuery(w.domain, state.k, state.l, state.or);
     try {
       const items = await secondResults(q, w, fresh);
-      state.boards.items.push(...items);
+      got.set(w.domain, items);
       renderBoards();
       renderRows(); // a platform row can now take its location and freshness from a board copy
-    } catch { /* one board down does not stop the others */ }
+    } catch { state.boards.failed++; } // one board down does not stop the others
   }));
+  for (const w of watch) if (!got.has(w.domain)) got.set(w.domain, prev.get(w.domain) || []);
+  state.boards.items = [...got.values()].flat();
   state.boards.status = "on";
   renderBoardsNote(); renderBoards();
 }
@@ -540,11 +544,11 @@ function renderBoards() {
   const clusters = clusterBoards(state.boards.items.filter((m) => m.job == null || m.job >= 3));
   const matchN = clusters.filter((c) => (c.loc ?? -1) >= 3).length;
   const place = state.l.trim();
-  const sub = off ? "off — no API key" : busy ? "asking now…" : `${clusters.length} ${clusters.length === 1 ? "role" : "roles"} found` + (place && matchN < clusters.length ? ` · ${matchN} match ${place}` : "");
   const cell = (v, cls) => `<td class="num"><span class="pill ${v != null ? cls : "sc-un"}">${v != null ? v.toFixed(1) : "–"}</span></td>`;
   const body = [];
   if (off) body.push(`<div class="hint">These boards are off. Add an API key and this search will ask them too, that is where jobs posted in the last few days usually show up first.</div>`);
   if (busy) body.push(`<div class="hint busy">asking ${esc(list)} now… matching each role to the jobs you searched for, results appear here as they arrive.</div>`);
+  if (state.boards.failed) body.push(`<div class="hint warn">⚠ ${state.boards.failed} of the ${state.watch.length} boards did not answer just now — their roles are the ones from the last time they did. Try again in a minute.</div>`);
   if (clusters.length && !off) {
     const rows = clusters.map((c) => {
       const srcs = c.items.map((m) => `<a href="${esc(m.url)}" target="_blank">${esc(m.name)}</a>`);
@@ -556,7 +560,19 @@ function renderBoards() {
     }).join("");
     body.push(`<table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th><th class="num" data-tip="${LOC_TIP}">loc</th><th class="num" data-tip="${LIVE_TIP}">live</th></tr></thead><tbody>${rows}</tbody></table><div class="hint">The copy a job board shows can lag the employer's own page. Open the posting to confirm the role is still open.</div>`);
   }
-  el.innerHTML = `<div class="sec-head"><h2 data-tip="The other job boards we ask for every search: ${esc(list)}.">Other job boards</h2><span class="sec-sub ${busy ? "busy" : ""}">${esc(sub)}</span><span class="sec-actions"><button class="btn-sm ${busy ? "btn-busy" : ""}" data-tip="Asks the other job boards for results this search missed. Free, and repeated searches are cached."${off ? ' disabled style="opacity:.55"' : ""}>${busy ? "looking…" : "look on other boards ↻"}</button></span></div>${body.join("")}`;
+  // the same bar as a platform row, so the section folds away like one
+  const roles = `${clusters.length} ${clusters.length === 1 ? "role" : "roles"}`;
+  const matchTxt = place ? `${matchN} match ${place}` : "—";
+  el.innerHTML = `<details class="prow boards" ${state.boardsOpen ? "open" : ""}>
+    <summary>
+      <span class="pname" data-tip="The other job boards we ask for every search: ${esc(list)}.">Other job boards</span>
+      <span class="counts ${busy ? "busy" : ""}">${off ? "off" : busy ? "…" : roles}</span>
+      <span class="counts ${busy ? "busy" : ""}">${off || busy ? "—" : matchTxt}</span>
+      <span class="links"><button class="btn-sm ${busy ? "btn-busy" : ""}" data-tip="Asks the other job boards for results this search missed. Free, and repeated searches are cached."${off ? ' disabled style="opacity:.55"' : ""}>${busy ? "looking…" : "look on other boards ↻"}</button></span>
+    </summary>
+    <div class="pbody">${body.join("")}</div>
+  </details>`;
+  el.querySelector("details")?.addEventListener("toggle", (e) => { state.boardsOpen = e.target.open; });
 }
 
 // ---- history ----

@@ -236,7 +236,9 @@ Every user-visible string this change adds.
 | Sidebar line, channel off | other boards: off — add an API key to include them | Without this, jobs posted in the last few days can be missing. Add an API key and we ask jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com for the same search. |
 | Sidebar line, working | other boards: asking now… | Asking jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com now. |
 | Section heading | Other job boards | The other job boards we ask for every search: jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com. |
-| Section sub-line | 34 roles found · 15 match Sydney | — (or "off — no API key", or "asking now…"; the "match" half appears only when a place was searched and some roles are elsewhere) |
+| Section bar, counts | 34 roles · 15 match Sydney | — (two cells, like a platform row's pages and jobs; the "match" half appears only when a place was searched; "off" and "…" while the boards are off or asking) |
+| Section bar, name | Other job boards | The other job boards we ask for every search: jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com. |
+| Section bar, when a board does not answer | ⚠ 4 of the 4 boards did not answer just now — their roles are the ones from the last time they did. Try again in a minute. | — |
 | Match marker | from a board copy | — |
 | Sources under a match | found on jobmesh.io jobflurry.com · listed in 2 places | — |
 | Under a match, when the board prints no employer | the posting's own first words, e.g. Cove is the operating entity for Deck2 Capital. Together, we acquire and operate good… | — (a quote, not a guess: two thirds of the board copies print no employer, and the title alone does not tell two roles apart) |
@@ -365,6 +367,22 @@ Key = normalised title + normalised location + a fingerprint of the posting.
   different roles do not, and neither swallows the other. Measured on the
   acceptance search: the Cove job is one row, "found on jobmesh.io jobflurry.com
   · listed in 2 places".
+
+### How the section reads
+
+The section is a collapsible bar like a platform row, so it folds away with the
+rest of the results: the name, the two counts, and the button sit in the same
+grid as every platform row above it. The board names stay in the tooltip, not
+in the bar, as decided earlier.
+
+Inside it, the roles are ordered so the best are on top: rows whose four
+scores are all green first, then the roles in the place that was searched,
+then the highest total. A role that scores green everywhere is a real posting
+in the right place that is still open — that is the row worth reading first.
+
+A board that does not answer (the provider rate-limits) does not take the
+section down. Its last good roles stay, and the bar says how many boards did
+not answer.
 
 ### The same posting in two places
 
