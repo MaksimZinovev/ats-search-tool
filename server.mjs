@@ -199,7 +199,11 @@ const server = createServer(async (req, res) => {
       return send(200, loadWatch(join(ROOT, "config.json")));
     if (req.method === "GET" && u.pathname === "/api/second") {
       if (!OLLAMA) return send(200, { disabled: true });
-      return send(200, await secondSearch(u.searchParams.get("q") || "", OLLAMA, Number(u.searchParams.get("max")) || 10));
+      try {
+        return send(200, await secondSearch(u.searchParams.get("q") || "", OLLAMA, Number(u.searchParams.get("max")) || 10));
+      } catch (e) {
+        return send(200, { error: String(e.message || e).slice(0, 80) });
+      }
     }
     if (req.method === "GET" && u.pathname === "/api/platforms")
       return send(200, PLATFORMS);

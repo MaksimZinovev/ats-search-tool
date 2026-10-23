@@ -406,6 +406,7 @@ async function secondResults(q, w, fresh) {
   if (!fresh) { const hit = cache2Get(q); if (hit) return hit; }
   const res = await fetch(`/api/second?q=${encodeURIComponent(q)}`).then((x) => x.json());
   if (res.disabled) throw new Error("no key");
+  if (res.error) throw new Error(res.error);
   const raw = res.results || [];
   const items = raw.map((r) => ({
     title: r.title, url: r.url, domain: w.domain, name: w.name,
