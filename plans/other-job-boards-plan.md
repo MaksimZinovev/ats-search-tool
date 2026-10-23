@@ -242,7 +242,8 @@ Every user-visible string this change adds.
 | Row button | look on other boards | Asks the other job boards for results this search missed. |
 | Section button | look on other boards ↻ | Asks the other job boards for results this search missed. Free, and repeated searches are cached. |
 | Row button, working | looking… | — (dashed border, pulsing) |
-| Row body, working | asking jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com for this one… | — |
+| Row body, working | asking <the platform's domain> for this one… | — (the platform names the domain being asked, because that is what a platform row is waiting for) |
+| Section, working | asking jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com now… | — |
 | Section, working | matching each role to the jobs you searched for, results appear here as they arrive. | — |
 | Skipped-row marker | ? | We could not ask the other job boards for this one, no API key. / We asked the other job boards for this one. Nothing there either, this role may not be published yet. |
 | Section footnote | — | The copy a job board shows can lag the employer's own page. Open the posting to confirm the role is still open. |
@@ -320,12 +321,12 @@ contract is small on purpose, so the two halves do not drift.
 | `GET /api/watch` | `[{domain, name}]` — the watch list from `config.json`, e.g. `{domain:"jobs-au.jobflurry.com", name:"jobflurry.com"}`. `name` is the short form the copy uses |
 | `GET /api/second?q=<query>` | `{count, results:[{title, url, content}]}` — one second-index search. `q` is a `site:` query the browser built; `{disabled:true}` when there is no key |
 | `POST /api/ai` | unchanged — the browser grades board copies with this same call, `results[].description` = the page text |
-| `POST /api/verify` | unchanged shape, plus an optional `fallbacks: {url: text}` map |
+| `POST /api/verify` | unchanged — no fallback map. Board copies are graded by the existing `/api/ai` call, because the copy's page text arrives as `results[].description` and that pass already asks `loc` and `live`; the browser colours those cells instead of muting them |
 
 `content` is the page text the provider read. The browser sends the first
-4,000 characters of it as `description`: the fields we need (location,
-posting date, employer) sit at the top of the page, and the grader does not
-need 17,000 characters to judge a posting.
+1,500 characters of it as `description`: the fields that decide location,
+posting date and employer sit in the first few hundred characters, and the
+grader's cost scales with the prompt.
 
 ### What the browser owns
 
@@ -345,20 +346,36 @@ Key = normalised title + normalised location.
 - employer: read from the page text when the board prints it (jobmesh prints
   it under the title; jobflurry and thebigjobsite do not). If two copies in a
   cluster both name an employer and the names differ, they are two roles and
-  split into two rows. If one copy has no employer, the cluster is marked as a
-  possible match, not a certain one.
+  split into two rows. If one copy names no employer, it merges into the
+  matching title and location cluster, and the cluster takes its employer and
+  posting date from whichever copy has them. That is why the Cove row can show
+  "Cove · Sydney, New South Wales · posted 19 Oct" from the jobmesh copy even
+  though the jobflurry copy carries neither. No wording is needed for a
+  possible match, so no string is added.
 
-### Two open points (alpha to confirm)
+### What triggers the second channel
 
-1. **What an empty platform row triggers.** The design diagram above says
-   "second-index search for that same domain"; the frozen copy for a platform
-   row says "asking jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com
-   for this one…". The copy is the frozen artefact, so the four boards are what
-   get asked, and the hits land in the "Other job boards" section. The diagram
-   line is the outlier.
-2. **A possible-match cluster has no string.** The copy table has no wording
-   for "this cluster might be two different roles". Proposal: append
-   `· may be a different role` to the sources line, only for such clusters.
+Two mechanisms, two different jobs. Both are one `GET /api/second?q=site:DOMAIN …`
+call, so the server does not care which one fires.
+
+| Trigger | What is asked | Where the hits land |
+|---|---|---|
+| Every search | the four watch-list boards | the "Other job boards" section |
+| A platform row that came back empty | that platform's own domain | that platform's row, so its counts fill in and its matches are scored |
+
+The watch list runs on every search because a healthy-looking search (every
+platform non-empty) must still be able to find a job that only exists on a job
+board. If the boards were asked only when some platform row was empty, that
+job would be missed exactly when the main search looks fine.
+
+The empty-row trigger asks that platform's own domain because that is the gap
+the watch list does not cover: a platform Brave has not crawled yet. If it
+asked the same four boards, it would duplicate an ask that already happened
+and "fire only on empty rows" would control nothing.
+
+The "look on other boards" button on a platform row and on the section asks the
+four boards again, fresh rather than cached, and their hits land in the
+section.
 
 ## Risks
 
@@ -382,13 +399,18 @@ Run the same three searches before and after: "qa engineer" with Sydney,
 | Board-copy rows with coloured location and freshness | 0 | every board-copy row |
 | Roles counted twice | n/a | 0 |
 | LLM tokens spent per search | unchanged | unchanged |
-| New calls per search | 0 | 4 to 6 search calls, cached for 24 hours |
+| New calls per search | 0 | 4 board searches plus one per empty platform row, cached for 24 hours |
 
 The acceptance case is the one that started this: a Quality Assurance Engineer
 role in Sydney posted on 2026-10-19, visible on a job board, invisible to the
 tool. After this change it must appear in the "Other job boards" section, with
-its location and freshness scored, and with the employer's own posting listed
-as the place to apply.
+its location and freshness scored, counted once, with every board copy listed
+under it.
+
+The employer behind that role has no ATS posting and no careers page, so the
+board copies are the whole story for it. The employer's own posting is listed
+alongside them when one exists; for this role there is none, and that is not a
+failure of the feature.
 
 ## Not in this change
 
