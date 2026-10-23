@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PLATFORMS, braveSearch } from "./lib.mjs";
+import { PLATFORMS, braveSearch, secondSearch, loadWatch } from "./lib.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8787;
@@ -19,6 +19,7 @@ if (existsSync(join(ROOT, ".env"))) {
 }
 const BRAVE = process.env.BRAVE_API_KEY || env.BRAVE_API_KEY || "";
 const TYPESAFE = process.env.TYPESAFE_API_KEY || env.TYPESAFE_API_KEY || "";
+const OLLAMA = process.env.OLLAMA_API_KEY || env.OLLAMA_API_KEY || "";
 
 const JOB_LEVELS = [
   "Clearly not a job posting: blog post, category or board index, company story, marketing or SEO page",
@@ -193,7 +194,13 @@ const server = createServer(async (req, res) => {
       return res.end(html);
     }
     if (req.method === "GET" && u.pathname === "/api/config")
-      return send(200, { brave: !!BRAVE, typesafe: !!TYPESAFE });
+      return send(200, { brave: !!BRAVE, typesafe: !!TYPESAFE, ollama: !!OLLAMA });
+    if (req.method === "GET" && u.pathname === "/api/watch")
+      return send(200, loadWatch(join(ROOT, "config.json")));
+    if (req.method === "GET" && u.pathname === "/api/second") {
+      if (!OLLAMA) return send(200, { disabled: true });
+      return send(200, await secondSearch(u.searchParams.get("q") || "", OLLAMA, Number(u.searchParams.get("max")) || 10));
+    }
     if (req.method === "GET" && u.pathname === "/api/platforms")
       return send(200, PLATFORMS);
     if (req.method === "GET" && u.pathname === "/api/count") {
