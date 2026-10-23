@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PLATFORMS, braveSearch, secondSearch, loadWatch } from "./lib.mjs";
+import { PLATFORMS, braveSearch, secondSearch, loadWatch, checkPostings } from "./lib.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8787;
@@ -219,6 +219,21 @@ const server = createServer(async (req, res) => {
       const body = JSON.parse(Buffer.concat(chunks).toString());
       if (!Array.isArray(body?.results) || !body.results.length) return send(200, { scores: [] });
       return send(200, { scores: await typesafeScores(body) });
+    }
+    if (req.method === "POST" && u.pathname === "/api/check") {
+      // is this board posting still there? the copy in the search index can be old
+      if (!OLLAMA) return send(200, { disabled: true });
+      const chunks = [];
+      let n = 0;
+      for await (const c of req) {
+        n += c.length;
+        if (n > 1e6) throw new Error("body too large");
+        chunks.push(c);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString());
+      const urls = (Array.isArray(body?.urls) ? body.urls : []).slice(0, 10);
+      if (!urls.length) return send(200, { states: [] });
+      return send(200, { states: await checkPostings(urls, OLLAMA) });
     }
     if (req.method === "POST" && u.pathname === "/api/verify") {
       if (!TYPESAFE) return send(200, { disabled: true });

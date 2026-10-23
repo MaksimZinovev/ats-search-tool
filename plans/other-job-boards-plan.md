@@ -368,6 +368,32 @@ Key = normalised title + normalised location + a fingerprint of the posting.
   acceptance search: the Cove job is one row, "found on jobmesh.io jobflurry.com
   · listed in 2 places".
 
+### Is the posting still open?
+
+The board's copy of a page in the search index is a snapshot. A role that
+closed last week still reads like a live one there, so its freshness score is
+the freshness of the copy, not of the role. Measured: the Automic posting
+("Senior AI QA Engineer", Sydney, 7 Oct) scored live 3.1 while the board's own
+page said the job is no longer available.
+
+So the tool checks. For the roles that claim to be open (up to six, the ones
+worth checking), the provider fetches the posting page itself and the answer
+is one of three:
+
+- **live** — the page is there now, and the copy is not old.
+- **gone** — the board says the job is no longer available. The row gets a
+  "no longer open" badge and its live score is 0, like a dead posting on a
+  platform.
+- **unknown** — the fetch failed. That is not the same as closed, so the
+  score is shown muted, not red, and the cell says we could not confirm it.
+
+A fetch that fails is not read as "closed": a live JobLeads posting also fails
+to fetch, because the provider is blocked there. Only the board's own words
+make a posting gone.
+
+A role we already checked keeps its verdict, so a repeat search asks nothing
+new.
+
 ### How the section reads
 
 The section is a result, so it is not there before there is one. On a fresh page

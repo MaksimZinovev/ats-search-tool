@@ -148,6 +148,47 @@ export async function secondSearch(query, key, max = 10) {
   return { count: results.length, results };
 }
 
+// The board's copy of a page in the search index can be older than the posting:
+// a job that closed last week still reads like a live one. So ask the provider
+// for the page itself, and say plainly what we could not confirm.
+const GONE = /no longer available|no longer open|no longer accepting|this (job|role|position) (is|has) (closed|expired|filled)|job (is )?no longer/i;
+const jobmeshApply = (url) => {
+  const m = String(url).match(/^https?:\/\/jobmesh\.io\/job\/([0-9a-f-]+)/i);
+  return m ? `https://jmmst.com/${m[1]}` : null; // the page the board's Apply button goes to
+};
+
+async function providerFetch(url, key) {
+  const r = await fetch("https://ollama.com/api/web_fetch", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!r.ok) return { ok: false, status: r.status };
+  const j = await r.json().catch(() => ({}));
+  return { ok: true, content: String(j.content || "") };
+}
+
+// "live" = the page is there now. "gone" = the board says the job is no longer
+// available. "unknown" = we could not fetch it, which is not the same thing.
+export async function checkPostings(urls, key) {
+  return Promise.all(urls.map(async (url) => {
+    let state = "unknown";
+    try {
+      const r = await providerFetch(url, key);
+      if (r.ok) state = GONE.test(r.content) ? "gone" : "live";
+      else if (r.status === 404) {
+        const alt = jobmeshApply(url);
+        if (alt) {
+          const r2 = await providerFetch(alt, key);
+          if (r2.ok) state = GONE.test(r2.content) ? "gone" : "live";
+        }
+      }
+    } catch { state = "unknown"; }
+    return { url, state };
+  }));
+}
+
 async function bravePage(query, key, offset) {
   const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=20&offset=${offset}`;
   // ponytail: one 429 retry with 1.2s backoff; real queue if heavy use ever needs it
