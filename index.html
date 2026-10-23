@@ -190,7 +190,7 @@ const RW_KEY = "ats-reviewed-v1"; // ponytail: per-browser marks; move behind an
 const rvGet = (u) => lsGet(RW_KEY, {})[u];
 const RW_TIP = "rv: you have personally checked this posting. Stored in this browser; survives re-searches and refreshes.";
 
-const state = { k: "", l: "", or: false, platforms: [], rows: [], sort: "jobs", cfg: { brave: false, typesafe: false, ollama: false }, busy: false, watch: [], watchReady: null, boards: { status: "off", items: [] }, boardsOpen: true };
+const state = { k: "", l: "", or: false, platforms: [], rows: [], sort: "jobs", cfg: { brave: false, typesafe: false, ollama: false }, busy: false, watch: [], watchReady: null, boards: { status: "off", items: [], asked: false }, boardsOpen: true };
 
 const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -466,6 +466,8 @@ function clusterBoards(items) {
 async function runBoards(fresh = false) {
   const watch = state.watch.length ? state.watch : await (state.watchReady || Promise.resolve([])); // a search can start before the list is in
   if (!state.cfg.ollama || !watch.length) { state.boards.items = []; state.boards.status = "off"; renderBoardsNote(); renderBoards(); return; }
+  if (!state.k.trim()) return; // no keywords yet, so there is nothing to ask the boards for
+  state.boards.asked = true;
   state.boards.status = "asking";
   state.boards.failed = 0;
   const prev = new Map(); // a board that does not answer keeps the roles it gave us last time
@@ -538,6 +540,7 @@ function renderBoardsNote() {
 function renderBoards() {
   const el = $("#boards");
   if (!el) return;
+  if (!state.boards.asked) { el.innerHTML = ""; return; } // nothing has been asked yet, so there is nothing to show
   const list = boardNames() || "the other job boards";
   const off = !state.cfg.ollama;
   const busy = state.boards.status === "asking";

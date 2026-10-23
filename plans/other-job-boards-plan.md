@@ -370,6 +370,13 @@ Key = normalised title + normalised location + a fingerprint of the posting.
 
 ### How the section reads
 
+The section is a result, so it is not there before there is one. On a fresh page
+it is not rendered at all: an empty bar saying "0 roles" before any search is a
+count of nothing, and a "look on other boards" button with no keywords asks the
+boards for the empty phrase (four calls for nothing). The sidebar line stays
+the one place that says the channel is on, and its tooltip names the boards.
+The section appears with the first search.
+
 The section is a collapsible bar like a platform row, so it folds away with the
 rest of the results: the name, the two counts, and the button sit in the same
 grid as every platform row above it. The board names stay in the tooltip, not
