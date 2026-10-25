@@ -4,3 +4,7 @@ node_modules/
 .local/
 .pi/
 .ck/
+.atuin/
+.ckignore
+config.json
+/.impeccable

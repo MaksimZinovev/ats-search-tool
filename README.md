@@ -28,6 +28,35 @@ Applicant Tracking System (ATS): Greenhouse, Lever, Workday, government boards.
 This tool runs one Brave `site:` search per platform, then expands any platform
 row into a ranked match list.
 
+### The whole flow on one picture
+
+```mermaid
+flowchart TD
+    U["You search: qa engineer · Sydney"] --> P
+    U --> B
+
+    subgraph S1["the platforms — Greenhouse, Lever, Workday and 26 more"]
+        P["each platform gets one scoped search:<br/>site:boards.greenhouse.io 'qa engineer' Sydney"] --> A["the AI reads every snippet:<br/>an open QA Engineer role in Sydney?"]
+        A --> R["Greenhouse lands as 13 pages · 11 jobs;<br/>lever.co as 40+ · 31 — each match graded 0–4"]
+    end
+
+    subgraph S2["other job boards — jobleads.com, jobmesh.io and two more"]
+        B["the same search asked through three engines,<br/>in turn: Ollama → Bright Data → Brave"] --> M["the first engine with roles wins:<br/>one role = one row, quoting the copy —<br/>'ASX Group is seeking a Lead QA Engineer…'"]
+    end
+
+    R -. "expand Greenhouse: the real posting pages<br/>get re-read and re-graded" .-> C
+    M -. "that copy can be days old —<br/>the check asks the employer's real page" .-> C
+    C["board copies age — roles that claim<br/>to be open get checked against<br/>the employer's real page"] --> C1{"who managed to read the page?"}
+    C1 -->|"1 — a free plain GET"| O
+    C1 -->|"2 — Ollama's fetch"| O
+    C1 -->|"3 — a local Lightpanda render<br/>(optional one-line install)"| O
+    O{"what the page says"} -->|"still open"| O1["Transport for NSW · Hybrid QA Test Engineer<br/>keeps its live score"]
+    O -->|"'…this job has recently been<br/>taken offline.'"| O2["that row flags 'no longer open'<br/>and its live score drops to 0"]
+    O -->|"a bot wall nobody could read"| O3["– could not confirm;<br/>no stale numbers"]
+    R --> CACHE["everything is cached for 24 hours —<br/>the same search tomorrow asks nothing"]
+    M --> CACHE
+```
+
 Each platform row shows:
 
 | Column | Meaning |
@@ -87,8 +116,25 @@ Two passes, both fed by Brave results and the posting pages themselves:
 
 Two keys in `.env` (copy `.env.example`):
 
-- `BRAVE_API_KEY` — powers the counts. Free tier: 2,000 queries/month.
+- `BRAVE_API_KEY` — powers the counts (free tier: 2,000 queries/month) and
+  the boards chain's last engine.
 - `TYPESAFE_API_KEY` — powers the AI grading. Optional: without it you still get all platform links and raw page counts.
+
+A third key is optional too:
+
+- `OLLAMA_API_KEY` — powers the boards search's first engine and the Ollama
+  fetch tier of the open-roles check. Any one of the three search keys turns
+  the boards on; a config with none of them leaves the boards off, and the
+  section's note names the keys that work.
+
+A fourth key is optional too, and serves the same section:
+
+- `BRIGHTDATA_SERP_API_KEY` — when Ollama is rate-limited or down, the second
+  search falls back to Bright Data's SERP API, which serves Google's index
+  (roles Ollama and Brave have not crawled). `BRIGHTDATA_SERP_ZONE` holds the
+  zone name from your Bright Data dashboard (`serp_api1` by default). Without
+  it a rate-limited Ollama just means that board search reports "did not
+  answer" for the moment.
 
 The grading engine is **JEV**, a scoring model from TypeSafe. It is not a
 traditional LLM. It does not generate text, and it does not chat. You give it
@@ -154,7 +200,9 @@ parallel.
 ```text
 ats-search-tool/
 ├── server.mjs            # zero-dependency HTTP server: APIs, verify pass, page text
-├── lib.mjs               # query building + paged Brave counting
+├── lib.mjs               # query building, paged Brave counting, the second
+│                           search's engine chain, board-row parsing, the reader
+│                           chain behind the gone-checks
 ├── index.html            # the whole UI (single file)
 ├── .env.example          # keys template
 ├── DESIGN.md             # design system (Ollama-derived monochrome)
@@ -173,6 +221,70 @@ LiveHire, Employment Hero and EthicalJobs, each tagged with a region chip.
 
 Some ATS hosts (NSW Jobs, LiveHire, UNSW, UniMelb) refuse scripted fetches;
 their verify pass reports the exact failure instead of guessing.
+
+## Other job boards
+
+Some postings are newer than the search engine. A role posted four days ago on
+a job board can sit there for a week before any index crawls it, and a plain
+fetch of that page is usually refused by the board's bot protection.
+
+With any one of the three search keys in `.env` (`OLLAMA_API_KEY`,
+`BRIGHTDATA_SERP_API_KEY` or `BRAVE_API_KEY`), every search also asks four
+job boards — jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com —
+through a second search index. The results land in an "Other job boards"
+section below the platform rows:
+
+- The page text comes back with the results, so a posting behind a bot wall is
+  readable and its location and posting date can be scored.
+- The same grading that scores a platform row scores these, with no extra
+  model call and no extra tokens. The second search is a search, not a chat.
+- One role is one row, even when it is listed on three boards. The row says
+  which boards it was found on.
+- A row that is a board's copy of a posting is marked "from a board copy", and
+  a board's copy can lag the employer's own page — open the posting to check.
+- The board round runs on the quota you give it: Ollama on your monthly
+  Ollama Cloud quota, Bright Data per request, and a Brave-only config spends
+  boards from its Brave account (a board search is a paged crawl — up to ~12
+  Brave calls per search). The results are cached for 24 hours, so a repeated
+  search asks nothing again.
+
+The boards to ask are in `config.json` (gitignored) if you want to change them.
+The defaults live in `lib.mjs`. The second search tries its providers in a
+fallback chain: Ollama first, then Bright Data's Google index (with
+`BRIGHTDATA_SERP_API_KEY`), then the same Brave channel the platform rows use.
+An engine that comes back empty is walked past the same way: the posting is
+asked of the next engine's index, and only when every configured engine has
+found nothing does the board say so.
+
+### Is the posting actually still open?
+
+Board copies age. Roles that claim to be open are therefore checked against
+the real posting page in the background (about six per search, the strongest
+claims first). The section then reports, for example: "Checked 3 roles that
+claim to be open: 2 are still open, 1 is closed, 0 we could not confirm."
+
+- A page that states the role is gone ("no longer available", "taken
+  offline"), or a real 404, flags the row **no longer open** and its live
+  score drops to 0.
+- A page no reader could fetch shows an em dash **–** in the live column:
+  we are honest that we could not confirm it, rather than repeat a possibly
+  stale board copy.
+- The readers are tried in order: a free plain GET, then Ollama's fetch, then
+  a local render with **Lightpanda** — a small headless browser that reads
+  pages the scripted GETs cannot (bot walls). Lightpanda is optional; one
+  line installs it and a wall page stops being a dash and starts being a
+  verdict:
+
+    `brew install lightpanda-io/browser/lightpanda-nightly`
+
+  Without it every check still runs — plain GET answers many pages — but
+  walled postings stay dash-marked instead of verified.
+
+### Reading the row marks
+
+- **muted score** — judged from the search snippet only (weak evidence)
+- **✕** — that page refused the fetch (bot check); the reason is in the tooltip
+- **–** — checked but the posting page could not be read, so no live verdict
 
 ## Features
 

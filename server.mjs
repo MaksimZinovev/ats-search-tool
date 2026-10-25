@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PLATFORMS, braveSearch } from "./lib.mjs";
+import { PLATFORMS, braveSearch, secondSearch, loadWatch, checkPostings, publicUrl } from "./lib.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8787;
@@ -14,11 +14,15 @@ if (existsSync(join(ROOT, ".env"))) {
   for (const line of readFileSync(join(ROOT, ".env"), "utf8").split("\n")) {
     if (line.trim().startsWith("#")) continue;
     const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m) env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+    if (m) {
+      env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+      process.env[m[1]] = env[m[1]]; // propagate to process.env for imported modules
+    }
   }
 }
-const BRAVE = process.env.BRAVE_API_KEY || env.BRAVE_API_KEY || "";
-const TYPESAFE = process.env.TYPESAFE_API_KEY || env.TYPESAFE_API_KEY || "";
+const BRAVE = process.env.BRAVE_API_KEY || "";
+const TYPESAFE = process.env.TYPESAFE_API_KEY || "";
+const OLLAMA = process.env.OLLAMA_API_KEY || "";
 
 const JOB_LEVELS = [
   "Clearly not a job posting: blog post, category or board index, company story, marketing or SEO page",
@@ -115,6 +119,7 @@ async function verifyPages(body) {
   for (let i = 0; i < urls.length; i++) {
     let err = null, page = "", fin = urls[i], gone = false;
     try {
+      if (!(await publicUrl(urls[i]))) throw new Error("internal address, not fetched"); // the same vetting /api/check runs
       const p = await fetch(urls[i], {
         headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36", Accept: "text/html" },
         redirect: "follow", signal: AbortSignal.timeout(10000),
@@ -134,7 +139,9 @@ async function verifyPages(body) {
         }
       }
     } catch (e) {
-      err = /timeout|abort/i.test(String(e.cause?.name || e.message || e)) ? "timed out" : "network error";
+      const msg = String(e.message || e);
+      err = /timeout|abort/i.test(String(e.cause?.name || msg)) ? "timed out"
+        : msg.includes("internal address") ? msg : "network error";
     }
     if (err) errs[i] = err;
     else if (gone) pregone[i] = true;
@@ -193,15 +200,32 @@ const server = createServer(async (req, res) => {
       return res.end(html);
     }
     if (req.method === "GET" && u.pathname === "/api/config")
-      return send(200, { brave: !!BRAVE, typesafe: !!TYPESAFE });
+      // boards: can any search engine answer? each engine joins on its own key
+      return send(200, { brave: !!BRAVE, typesafe: !!TYPESAFE, ollama: !!OLLAMA, boards: !!(OLLAMA || process.env.BRIGHTDATA_SERP_API_KEY || BRAVE) });
+    if (req.method === "GET" && u.pathname === "/api/watch")
+      return send(200, loadWatch(join(ROOT, "config.json")));
+    if (req.method === "GET" && u.pathname === "/api/second") {
+      // the search runs when ANY engine has a key; secondSearch skips the ones that do not
+      if (!(OLLAMA || process.env.BRIGHTDATA_SERP_API_KEY || BRAVE)) return send(200, { disabled: true });
+      try {
+        return send(200, await secondSearch(u.searchParams.get("q") || "", OLLAMA, Number(u.searchParams.get("max")) || 10));
+      } catch (e) {
+        return send(200, { error: String(e.message || e).slice(0, 80) });
+      }
+    }
     if (req.method === "GET" && u.pathname === "/api/platforms")
       return send(200, PLATFORMS);
     if (req.method === "GET" && u.pathname === "/api/count") {
       if (!BRAVE) return send(200, { disabled: true });
-      return send(200, await braveSearch(u.searchParams.get("q") || "", BRAVE));
+      try {
+        return send(200, await braveSearch(u.searchParams.get("q") || "", BRAVE));
+      } catch (e) {
+        return send(200, { error: String(e.message || e).slice(0, 80) }); // a rate hit reads as the error row, not "undefined pages"
+      }
     }
     if (req.method === "POST" && u.pathname === "/api/ai") {
       if (!TYPESAFE) return send(200, { disabled: true });
+      if (!/application\/json/.test(req.headers["content-type"] || "")) return send(400, { error: "send application/json" }); // browser pages cannot send this header: no cross-origin body posts
       const chunks = [];
       let n = 0;
       for await (const c of req) {
@@ -213,8 +237,26 @@ const server = createServer(async (req, res) => {
       if (!Array.isArray(body?.results) || !body.results.length) return send(200, { scores: [] });
       return send(200, { scores: await typesafeScores(body) });
     }
+    if (req.method === "POST" && u.pathname === "/api/check") {
+      // is this board posting still there? the copy in the search index can be old.
+      // runs with no keys at all: plain GET needs none, ollamaFetch skips itself,
+      // and an all-unreadable answer is the honest "unknown"
+      if (!/application\/json/.test(req.headers["content-type"] || "")) return send(400, { error: "send application/json" }); // browser pages cannot send this header: no cross-origin body posts
+      const chunks = [];
+      let n = 0;
+      for await (const c of req) {
+        n += c.length;
+        if (n > 1e6) throw new Error("body too large");
+        chunks.push(c);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString());
+      const urls = (Array.isArray(body?.urls) ? body.urls : []).slice(0, 10);
+      if (!urls.length) return send(200, { states: [] });
+      return send(200, { states: await checkPostings(urls, OLLAMA) });
+    }
     if (req.method === "POST" && u.pathname === "/api/verify") {
       if (!TYPESAFE) return send(200, { disabled: true });
+      if (!/application\/json/.test(req.headers["content-type"] || "")) return send(400, { error: "send application/json" }); // browser pages cannot send this header: no cross-origin body posts
       const chunks = [];
       let n = 0;
       for await (const c of req) {

@@ -48,6 +48,7 @@
   .grid-header span:nth-child(2), .grid-header span:nth-child(3), .prow summary .counts { text-align: right; }
   .grid-header [data-tip] { margin-left: 0; }
   .prow { border-bottom: 1px solid var(--line); }
+  .prow.boards summary { grid-template-columns: minmax(160px, 1fr) 90px 130px minmax(140px, auto); } /* the second count says how many match the place */
   .prow summary { cursor: pointer; list-style: none; position: relative; padding-left: 28px; }
   .prow summary::-webkit-details-marker { display: none; }
   .prow summary::before { content: "▸"; position: absolute; left: 12px; color: var(--silver); }
@@ -75,11 +76,11 @@
   .matches-table th.num, .matches-table td.num { text-align: right; width: 52px; font-family: ui-monospace, Menlo, monospace; }
   .matches-table th[data-tip] { margin-left: 0; text-decoration: underline dotted var(--silver); text-underline-offset: 3px; }
   .matches-table tr.dim { color: var(--stone); }
-  .matches-table td.sc { font-weight: 500; border-radius: 9999px; }
-  .matches-table td.sc-hi { background: #e6f4ea; color: #137333; } /* score colours: the one chromatic exception */
-  .matches-table td.sc-mid { background: #fef7e0; color: var(--warn); }
-  .matches-table td.sc-lo { background: #fce8e6; color: var(--err); }
-  .matches-table td.sc-un { color: var(--silver); } /* snippet-only or "unclear" — deliberately muted */
+  .pill { display: inline-block; min-width: 34px; padding: 1px 8px; border-radius: 9999px; font-weight: 500; text-align: center; }
+  .pill.sc-hi { background: #e6f4ea; color: #137333; } /* score colours: the one chromatic exception */
+  .pill.sc-mid { background: #fef7e0; color: var(--warn); }
+  .pill.sc-lo { background: #fce8e6; color: var(--err); }
+  .pill.sc-un { color: var(--silver); } /* snippet-only or "unclear" — deliberately muted */
   .matches-table td.sc-blk { background: var(--bg); border: 1px dashed #d5a0a0; color: var(--err); cursor: help; } /* fetch blocked — loud, not a score */
   .hint.vbusy { color: var(--mid); animation: pulse 1s infinite; }
   .hint.warn { color: var(--err); }
@@ -94,6 +95,20 @@
     opacity: 0; visibility: hidden; transition: opacity 0.15s; z-index: 10; pointer-events: none;
   }
   [data-tip]:hover::after { opacity: 1; visibility: visible; }
+  /* ---- other job boards ---- */
+  [data-tip].tip-down::after { top: calc(100% + 6px); bottom: auto; right: auto; left: 0; }
+  .note { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--stone); margin: 12px 0 0; }
+  .qmark { display: inline-block; width: 15px; height: 15px; line-height: 14px; text-align: center; border: 1px dashed var(--line2); border-radius: 9999px; color: var(--stone); font-size: 11px; }
+  .btn-sm { padding: 3px 11px; font-size: 11px; color: var(--text); }
+  .btn-busy { border-style: dashed; animation: pulse 1s infinite; }
+  .badge { display: inline-block; font-size: 11px; color: var(--stone); border: 1px solid var(--line2); border-radius: 9999px; padding: 1px 8px; white-space: nowrap; }
+  .badge.gone { color: var(--err); border-color: var(--err); }
+  .meta { font-size: 11px; color: var(--stone); margin-top: 2px; }
+  .quote { font-size: 11px; color: var(--silver); margin-top: 2px; }
+  .srcs { display: flex; gap: 10px; align-items: center; font-size: 11px; color: var(--stone); margin-top: 3px; }
+  .srcs a { color: var(--mid); text-decoration: underline; text-underline-offset: 2px; }
+  .srcs .multi { color: var(--silver); }
+  .busy { color: var(--mid); animation: pulse 1s infinite; }
   .plat { display: grid; grid-template-columns: auto minmax(90px, 1.2fr) minmax(120px, 1fr) auto; gap: 6px; margin-bottom: 6px; align-items: center; }
   .plat input { padding: 5px 10px; font-size: 11px; min-width: 0; }
   .plat button, #platAdd button { padding: 4px 10px; }
@@ -106,7 +121,7 @@
   #empty { color: var(--silver); padding: 30px 10px; text-align: center; }
   footer { padding: 0 24px 24px; color: var(--silver); font-size: 11px; }
   @media (prefers-reduced-motion: reduce) {
-    .counts.dot, .hint.vbusy { animation: none; }
+    .counts.dot, .hint.vbusy, .busy, .btn-busy { animation: none; }
     [data-tip]::after { transition: none; }
   }
 </style>
@@ -129,6 +144,7 @@
       </label>
       <label class="or"><input type="checkbox" id="or"> Boolean OR mode (comma-separated terms)</label>
       <button id="searchBtn">Search</button>
+      <div class="note tip-down" id="boardsNote" data-tip=""><span>other boards: on</span></div>
       <div class="hint howto">Click a platform row to expand it. An AI reads the results and grades every match from 0 (poor) to 4 (strong) on keywords, open-role odds, location and freshness. Dead or unreachable pages are labelled.</div>
       <div class="hint" id="quotaHint"></div>
     </section>
@@ -160,6 +176,7 @@
     </div>
     <div class="grid-header"><span>platform</span><span data-tip="pages = results found on this platform (Brave site: search; exact up to 60, 60+ means more). Click a platform row to expand it.">pages</span><span data-tip="jobs = results that scored 3+ on the is-it-real scale. Expand a platform for ranked matches with rel/job/loc/live; loc and live get re-scored from the actual posting pages when you expand.">jobs</span><span></span></div>
     <div id="rows"><div id="empty">Enter keywords and click Search. Links appear instantly; counts fill in per platform at about one per second.</div></div>
+    <div id="boards"></div>
   </section>
 </main>
 <footer>Runs locally; nothing leaves this machine except the search queries sent to Brave and TypeSafe. No accounts; your API keys and history stay here. The free tier covers 2,000 Brave queries a month, about 1 to 3 per platform.</footer>
@@ -174,7 +191,7 @@ const RW_KEY = "ats-reviewed-v1"; // ponytail: per-browser marks; move behind an
 const rvGet = (u) => lsGet(RW_KEY, {})[u];
 const RW_TIP = "rv: you have personally checked this posting. Stored in this browser; survives re-searches and refreshes.";
 
-const state = { k: "", l: "", or: false, platforms: [], rows: [], sort: "jobs", cfg: { brave: false, typesafe: false }, busy: false };
+const state = { k: "", l: "", or: false, platforms: [], rows: [], sort: "jobs", cfg: { brave: false, typesafe: false, ollama: false }, busy: false, watch: [], watchReady: null, boards: { status: "off", items: [], asked: false }, boardsOpen: true };
 
 const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -207,12 +224,13 @@ function cachePut(q, r) {
 // ---- per-row pipeline (search loop + ↻ refresh) ----
 async function fetchRow(r, skipCache = false) {
   const c = !skipCache && cacheGet(r.query);
-  if (c) { Object.assign(r, c, { status: "done" }); renderRows(); return; }
+  if (c) { Object.assign(r, c, { status: "done" }); renderRows(); askIfEmpty(r); return; }
   if (!state.cfg.brave) { r.status = "err"; r.err = "no Brave key"; renderRows(); return; }
   r.status = "dot"; renderRows();
   try {
     const res = await fetch(`/api/count?q=${encodeURIComponent(r.query)}`).then((x) => x.json());
     if (res.disabled) { r.status = "err"; r.err = "no Brave key"; renderRows(); return; }
+    if (res.error) { r.status = "err"; r.err = res.error; renderRows(); return; } // the count never came back
     r.count = res.count; r.capped = res.capped; r.matches = []; r.jobs = null;
     if (state.cfg.typesafe && res.results?.length) {
       const ai = await fetch("/api/ai", {
@@ -230,6 +248,7 @@ async function fetchRow(r, skipCache = false) {
     r.status = "done"; cachePut(r.query, r);
   } catch (e) { r.status = "err"; r.err = String(e.message || e).slice(0, 60); }
   renderRows();
+  askIfEmpty(r);
 }
 
 // verify pass: re-score loc/live from the real posting pages (runs on expand, top 10)
@@ -263,9 +282,10 @@ async function search() {
   state.rows = state.platforms.filter((p) => !p.hidden).map((p) => {
     const q = buildQuery(p.domain, k, state.l, state.or);
     return { id: p.id, name: p.name, domain: p.domain, region: p.region || "", query: q, bUrl: braveUrl(q), gUrl: googleUrl(q),
-      status: "link", count: null, capped: null, jobs: null, matches: [], err: null };
+      status: "link", count: null, capped: null, jobs: null, matches: [], err: null, second: null };
   });
   renderRows(); pushHistory();
+  runBoards(); // the other boards are asked on every search, in the background
   for (const r of state.rows) { await fetchRow(r); await sleep(350); } // ponytail: crude 1qps pacing + server 429 retry
   state.busy = false; $("#searchBtn").disabled = false;
 }
@@ -273,13 +293,14 @@ async function search() {
 // ---- render ----
 function pagesText(r) {
   if (r.status === "link") return "—";
-  if (r.status === "dot") return "…";
+  if (r.status === "dot" || r.second === "asking") return "…";
   if (r.status === "err") return esc(r.err || "error");
+  if (r.count == null) return "—"; // a count that never came back is not "undefined"
   const pW = r.capped || r.count !== 1 ? "pages" : "page";
   return `${r.capped ? `${r.count}+` : r.count} ${pW}`;
 }
 function jobsText(r) {
-  if (r.status === "dot") return "…";
+  if (r.status === "dot" || r.second === "asking") return "…";
   if (r.status !== "done" || r.jobs == null) return "—";
   return `${r.jobs} ${r.jobs === 1 ? "job" : "jobs"}`;
 }
@@ -297,28 +318,36 @@ const scoreCls = (v) => (v >= 3 ? "sc-hi" : v >= 2 ? "sc-mid" : "sc-lo");
 const locCls = (v) => (v === 0 ? "sc-un" : scoreCls(v)); // 0 = "unknown" → muted, not alarm-red
 const liveCls = (v) => (v >= 1.5 && v < 2.5 ? "sc-un" : scoreCls(v)); // ≈2 "unclear" → muted, real signals get colour
 
-function matchHtml(m) {
-  const cell = (v, cls) => `<td class="num sc ${v != null ? cls : ""}">${v != null ? v.toFixed(1) : "–"}</td>`;
-  const blk = `<td class="num sc sc-blk" title="posting page could not be fetched: ${esc(m.verr || "blocked")}">✕</td>`;
-  const locCell = m.verr ? blk : cell(m.loc, m.v ? locCls(m.loc) : "sc-un"); // m.v = verified from page
-  const liveCell = m.verr ? blk : cell(m.live, m.v ? liveCls(m.live) : "sc-un");
+function matchHtml(m, boards) {
+  const cell = (v, cls) => `<td class="num"><span class="pill ${v != null ? cls : "sc-un"}">${v != null ? v.toFixed(1) : "–"}</span></td>`;
+  const blk = `<td class="num sc-blk" title="posting page could not be fetched: ${esc(m.verr || "blocked")}">✕</td>`;
+  const bc = boards?.get(m.url); // the same posting, read through the board copy
+  const fromBoard = (v, cls) => `<td class="num" title="location and freshness scored from the board copy of this posting"><span class="pill ${cls}">${v.toFixed(1)}</span></td>`;
+  // a board copy read the whole posting, so its scores beat a snippet score and a blocked fetch
+  const locCell = bc && bc.loc != null ? fromBoard(bc.loc, locCls(bc.loc)) : m.verr ? blk : cell(m.loc, m.v ? locCls(m.loc) : "sc-un"); // m.v = verified from page
+  const liveCell = bc && bc.live != null ? fromBoard(bc.live, liveCls(bc.live)) : m.verr ? blk : cell(m.live, m.v ? liveCls(m.live) : "sc-un");
   return `<tr class="${(m.job ?? 0) < 3 ? "dim" : ""}"><td><a href="${esc(m.url)}" target="_blank">${esc(m.title || m.url)}</a></td>${cell(m.rel, scoreCls(m.rel))}${cell(m.job, scoreCls(m.job))}${locCell}${liveCell}<td class="num"><input type="checkbox" class="rvbox" data-u="${esc(m.url)}" title="reviewed (stored in this browser)" ${rvGet(m.url) ? "checked" : ""}></td></tr>`;
 }
 function matchBody(r) {
   if (r.status !== "done") return "";
   const n = r.matches?.length || 0;
+  const boards = new Map((state.boards.items || []).map((b) => [b.url, b])); // the same posting, seen through a board
   const notes = [];
   if (r.vbusy) notes.push(`<div class="hint vbusy">fetching posting pages, verifying loc/live…</div>`);
   else {
     const goneN = r.matches?.filter((m) => m.gone).length || 0;
     if (goneN) notes.push(`<div class="hint warn">⚠ ${goneN} of ${n} postings no longer exist: the page redirects to a board list, or states the role is no longer open. Live is forced to 0.</div>`);
     const bad = r.matches?.filter((m) => m.verr) || [];
-    if (bad.length) notes.push(`<div class="hint warn">⚠ ${bad.length} of ${n} posting pages could not be fetched (${[...new Set(bad.map((m) => m.verr))].join(", ")}), so those rows show ✕ and keep their snippet scores.</div>`);
-    else if (r.matches?.some((m) => !m.v)) notes.push(`<div class="hint">loc/live above use search snippets only; expanding this row re-checks them on the actual posting pages${n > 10 ? " (top 10)" : ""}.</div>`);
+    const mirrored = r.matches?.filter((m) => boards.get(m.url)?.loc != null).length || 0;
+    if (bad.length) {
+      const left = bad.length - mirrored;
+      notes.push(`<div class="hint warn">⚠ ${bad.length} of ${n} posting pages could not be fetched (${[...new Set(bad.map((m) => m.verr))].join(", ")}).${mirrored ? ` ${mirrored} took their location and freshness from the board copy instead.` : ""}${left ? ` ${left} show ✕ and keep their snippet scores.` : ""}</div>`);
+    }
+    else if (r.matches?.some((m) => !m.v)) notes.push(`<div class="hint">loc/live above use search snippets only; expanding this row re-checks them on the actual posting pages${n > 10 ? " (top 10)" : ""}.${mirrored ? ` ${mirrored} took theirs from the board copy instead.` : ""}</div>`);
   }
   if (n) {
     const rvN = r.matches.filter((m) => rvGet(m.url)).length;
-    return `<div class="hint rv-line">${rvN} of ${n} reviewed</div><table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th><th class="num" data-tip="${LOC_TIP}">loc</th><th class="num" data-tip="${LIVE_TIP}">live</th><th class="num" data-tip="${RW_TIP}">✓</th></tr></thead><tbody>${r.matches.map(matchHtml).join("")}</tbody></table>${notes.join("")}`;
+    return `<div class="hint rv-line">${rvN} of ${n} reviewed</div><table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th><th class="num" data-tip="${LOC_TIP}">loc</th><th class="num" data-tip="${LIVE_TIP}">live</th><th class="num" data-tip="${RW_TIP}">✓</th></tr></thead><tbody>${r.matches.map((m) => matchHtml(m, boards)).join("")}</tbody></table>${notes.join("")}`;
   }
   if (r.count) return `<div class="hint">raw pages only; the TypeSafe key is off, so no job filtering or ranking</div>`;
   return `<div class="hint">0 results on Brave; try the G link to double-check Google</div>`;
@@ -335,17 +364,269 @@ function renderRows() {
     <details class="prow ${r.status === "done" && !r.count ? "zero" : ""}" data-pid="${esc(r.id)}" ${open.has(r.id) ? "open" : ""}>
       <summary>
         <span class="pname">${esc(r.name)}<span class="dom">${esc(r.domain)}</span>${r.region ? `<span class="region">${esc(r.region)}</span>` : ""}</span>
-        <span class="counts ${r.status}">${pagesText(r)}</span>
-        <span class="counts ${r.status}">${jobsText(r)}</span>
+        <span class="counts ${r.second === "asking" ? "busy" : r.status}">${pagesText(r)}</span>
+        <span class="counts ${r.second === "asking" ? "busy" : r.status}">${jobsText(r)}</span>
         <span class="links">
           <a href="${r.bUrl}" target="_blank">Brave↗</a>
           <a class="g" href="${r.gUrl}" target="_blank" title="Open on Google">G</a>
           <button class="rf" data-q="${esc(r.query)}" title="Refresh (clears 24h cache)">↻</button>
+          <button class="btn-sm ${state.boards.status === "asking" ? "btn-busy" : ""}" data-tip="Asks the other job boards for results this search missed.">${state.boards.status === "asking" ? "looking…" : "look on other boards"}</button>
+          ${skipMark(r)}
         </span>
       </summary>
-      <div class="pbody">${matchBody(r)}</div>
+      <div class="pbody">${r.second === "asking" ? `<div class="hint busy">asking ${esc(r.domain)} for this one…</div>` : matchBody(r)}</div>
     </details>`).join("")
     : `<div id="empty">Enter keywords and click Search. Links appear instantly; counts fill in per platform at about one per second.</div>`;
+}
+
+// ---- other job boards: the second search channel ----
+// ponytail: the provider reads the page for us, so a posting behind a bot wall arrives as plain text.
+const CACHE2_KEY = "ats-cache2-v1";
+const DESC_CHARS = 1500; // location, posting date and employer sit in the first few hundred characters
+
+const boardNames = () => {
+  const n = state.watch.map((w) => w.name);
+  return n.length > 1 ? n.slice(0, -1).join(", ") + " and " + n[n.length - 1] : n.join(", ");
+};
+
+// The server reads the fields out of the page text (lib.mjs), so the browser only renders them.
+
+function cache2Get(q) {
+  const c = lsGet(CACHE2_KEY, {})[q];
+  return c && Date.now() - c.t < TTL ? c.items : null;
+}
+function cache2Put(q, items) {
+  const c = lsGet(CACHE2_KEY, {});
+  c[q] = { t: Date.now(), items };
+  const keys = Object.keys(c);
+  if (keys.length > 200) for (const k of keys.sort((a, b) => c[a].t - c[b].t).slice(0, keys.length - 200)) delete c[k];
+  lsSet(CACHE2_KEY, c);
+}
+
+// One second-channel search, graded by the same TypeSafe batch the platform rows use.
+async function secondResults(q, w, fresh) {
+  if (!fresh) { const hit = cache2Get(q); if (hit) return hit; }
+  const res = await fetch(`/api/second?q=${encodeURIComponent(q)}`).then((x) => x.json());
+  if (res.disabled) throw new Error("no key");
+  if (res.error) throw new Error(res.error);
+  const raw = res.results || [];
+  const items = raw.map((r) => ({
+    title: r.title, url: r.url, domain: w.domain, name: w.name,
+    employer: r.employer || "", location: r.location || "", posted: r.posted || "", quote: r.quote || "", key: r.key || "",
+    rel: null, job: null, loc: null, live: null,
+  }));
+  if (state.cfg.typesafe && items.length) {
+    const ai = await fetch("/api/ai", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: q, keywords: state.k, location: state.l, results: raw.map((r) => ({ title: r.title, description: (r.content || "").slice(0, DESC_CHARS) })) }),
+    }).then((x) => x.json());
+    if (ai.scores) items.forEach((m, i) => {
+      const s = ai.scores.find((x) => x.i === i);
+      m.rel = s?.rel ?? null; m.job = s?.job ?? null; m.loc = s?.loc ?? null; m.live = s?.live ?? null;
+    });
+  }
+  if (!fresh) cache2Put(q, items);
+  return items;
+}
+
+// One role is one row: copies of the same role are clustered by title + location,
+// and split apart when both name an employer and the employers differ.
+function clusterBoards(items) {
+  const groups = new Map();
+  for (const it of items) {
+    const k = it.key;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(it);
+  }
+  const out = [];
+  for (const g of groups.values()) {
+    const buckets = new Map();
+    for (const it of g.filter((x) => x.employer)) {
+      const e = it.employer.toLowerCase();
+      if (!buckets.has(e)) buckets.set(e, { employer: it.employer, items: [] });
+      buckets.get(e).items.push(it);
+    }
+    const list = [...buckets.values()];
+    const anon = g.filter((x) => !x.employer);
+    if (anon.length && !list.length) list.push({ employer: "", items: [] });
+    for (const it of anon) list[0].items.push(it); // a copy with no employer joins the cluster it matches
+    out.push(...list);
+  }
+  const best = (list, k) => { const v = list.map((i) => i[k]).filter((x) => x != null); return v.length ? Math.max(...v) : null; };
+  // green-first, then left-to-right by score columns (rel, job, loc, live)
+  const greenCount = (c) => [c.rel, c.job, c.loc, c.live].filter((v) => v != null && v >= 3).length;
+  return out.map((b) => {
+    const rich = b.items.find((x) => x.employer && x.posted) || b.items.find((x) => x.employer) || b.items.find((x) => x.posted) || b.items[0];
+    return {
+      title: b.items[0].title, employer: b.employer || rich.employer || "", location: rich.location || "", posted: rich.posted || "",
+      quote: rich.quote || b.items[0].quote || "",
+      items: b.items, rel: best(b.items, "rel"), job: best(b.items, "job"), loc: best(b.items, "loc"), live: best(b.items, "live"),
+      // did the posting survive? the copy in the search index can be older than the posting
+      check: b.items.find((x) => x.check === "gone") ? "gone" : b.items.find((x) => x.check === "live") ? "live" : b.items.find((x) => x.check) ? "unknown" : "",
+    };
+  }).sort((a, b) => (greenCount(b) - greenCount(a)) || (b.rel ?? -1) - (a.rel ?? -1) || (b.job ?? -1) - (a.job ?? -1) || (b.loc ?? -1) - (a.loc ?? -1) || (b.live ?? -1) - (a.live ?? -1));
+}
+
+// Ask the other boards for this search. They are asked on every search; each one lands as it arrives.
+async function runBoards(fresh = false) {
+  const watch = state.watch.length ? state.watch : await (state.watchReady || Promise.resolve([])); // a search can start before the list is in
+  if (!state.cfg.boards || !watch.length) { state.boards.items = []; state.boards.status = "off"; renderBoardsNote(); renderBoards(); return; }
+  if (!state.k.trim()) return; // no keywords yet, so there is nothing to ask the boards for
+  state.boards.asked = true;
+  state.boards.status = "asking";
+  state.boards.checked = "";
+  state.boards.checkStats = null;
+  state.boards.checkFailed = false;
+  state.boards.failed = 0;
+  const prev = new Map(); // a board that does not answer keeps the roles it gave us last time
+  for (const it of state.boards.items) { if (!prev.has(it.domain)) prev.set(it.domain, []); prev.get(it.domain).push(it); }
+  renderBoardsNote(); renderBoards();
+  const got = new Map();
+  await Promise.all(watch.map(async (w) => {
+    const q = buildQuery(w.domain, state.k, state.l, state.or);
+    try {
+      const items = await secondResults(q, w, fresh);
+      got.set(w.domain, items);
+      renderBoards();
+      renderRows(); // a platform row can now take its location and freshness from a board copy
+    } catch { state.boards.failed++; } // one board down does not stop the others
+  }));
+  for (const w of watch) if (!got.has(w.domain)) got.set(w.domain, prev.get(w.domain) || []);
+  state.boards.items = [...got.values()].flat();
+  state.boards.status = "on";
+  renderBoardsNote(); renderBoards();
+  checkBoardRows();
+}
+
+// A board's copy of a page can be older than the posting, so the freshness it
+// shows is a snapshot. Check the roles we are recommending most strongly, and
+// say what we could and could not confirm.
+async function checkBoardRows() {
+  // the roles that claim to be open, the ones worth checking; a copy we already
+  // checked keeps its verdict, so a repeat search asks nothing
+  const rows = clusterBoards(state.boards.items.filter((m) => m.job == null || m.job >= 3)).filter((c) => (c.live ?? 0) >= 3 && !c.items[0].check).slice(0, 6);
+  if (!rows.length) return;
+  const byUrl = new Map(state.boards.items.map((i) => [i.url, i]));
+  const urls = rows.map((c) => c.items[0].url);
+  state.boards.checked = "asking";
+  state.boards.checkFailed = false; // a rerun of the ask starts without the old failure claim
+  renderBoards();
+  try {
+    const res = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ urls }) }).then((r) => r.json());
+    const stats = { live: 0, gone: 0, unknown: 0 };
+    for (const s of res.states || []) {
+      const it = byUrl.get(s.url);
+      if (!it) continue;
+      it.check = s.state;
+      if (s.state === "gone") it.live = 0; // the board says the job is no longer available
+      stats[s.state] = (stats[s.state] || 0) + 1;
+    }
+    state.boards.checkStats = { n: urls.length, ...stats };
+  } catch {
+    // the check itself failed (server hiccup, network): say so — the row
+    // scores below stay board-copy evidence, not verified verdicts
+    state.boards.checkFailed = true;
+  }
+  state.boards.checked = "done";
+  renderBoards(); renderRows();
+}
+
+// A platform row that Brave found empty asks for its own domain: the same platform, read by the provider.
+async function askRow(r) {
+  if (r.second) return;
+  r.second = "asking";
+  renderRows();
+  try {
+    const items = await secondResults(buildQuery(r.domain, state.k, state.l, state.or), { domain: r.domain, name: r.domain });
+    r.second = "done";
+    if (items.length) {
+      r.count = items.length; r.capped = false;
+      r.matches = items.map((m) => ({ title: m.title, url: m.url, job: m.job, rel: m.rel, loc: m.loc, live: m.live, v: false }))
+        .sort((a, b) => (b.rel ?? -1) - (a.rel ?? -1));
+      r.jobs = r.matches.filter((m) => (m.job ?? 0) >= 3).length;
+    }
+  } catch { r.second = "err"; }
+  renderRows();
+}
+const askIfEmpty = (r) => { if (state.cfg.boards && r.status === "done" && !r.count) askRow(r); };
+
+// The marker on a row the other boards had nothing for.
+function skipMark(r) {
+  if (r.status !== "done" || r.count || r.second === "asking") return "";
+  const tip = state.cfg.boards
+    ? "We asked the other job boards for this one. Nothing there either, this role may not be published yet."
+    : "We could not ask the other job boards for this one, no API key.";
+  return `<span class="qmark" data-tip="${esc(tip)}">?</span>`;
+}
+
+function renderBoardsNote() {
+  const el = $("#boardsNote");
+  if (!el) return;
+  const list = boardNames() || "the other job boards";
+  let text, tip, mark = `<span class="qmark">?</span>`;
+  if (!state.cfg.boards) {
+    text = "other boards: off — add an API key to include them";
+    tip = `Without this, jobs posted in the last few days can be missing. Add one of OLLAMA_API_KEY, BRIGHTDATA_SERP_API_KEY or BRAVE_API_KEY to .env and we ask ${list} for the same search.`;
+  } else if (state.boards.status === "asking") {
+    text = "other boards: asking now…";
+    tip = `Asking ${list} now.`;
+    mark = "";
+  } else {
+    text = "other boards: on";
+    tip = `We ask ${list} for the same search. Jobs posted in the last few days often show up here first, before the main search has caught up.`;
+  }
+  el.dataset.tip = tip;
+  el.innerHTML = `<span>${esc(text)}</span>${mark}`;
+}
+
+function renderBoards() {
+  const el = $("#boards");
+  if (!el) return;
+  if (!state.boards.asked) { el.innerHTML = ""; return; } // nothing has been asked yet, so there is nothing to show
+  const list = boardNames() || "the other job boards";
+  const off = !state.cfg.boards;
+  const busy = state.boards.status === "asking";
+  const clusters = clusterBoards(state.boards.items.filter((m) => m.job == null || m.job >= 3));
+  const matchN = clusters.filter((c) => (c.loc ?? -1) >= 3).length;
+  const place = state.l.trim();
+  const cell = (v, cls) => `<td class="num"><span class="pill ${v != null ? cls : "sc-un"}">${v != null ? v.toFixed(1) : "–"}</span></td>`;
+  const body = [];
+  if (off) body.push(`<div class="hint">These boards are off. Add an API key and this search will ask them too, that is where jobs posted in the last few days usually show up first.</div>`);
+  if (busy) body.push(`<div class="hint busy">asking ${esc(list)} now… matching each role to the jobs you searched for, results appear here as they arrive.</div>`);
+  if (state.boards.failed) body.push(`<div class="hint warn">⚠ ${state.boards.failed} of the ${state.watch.length} boards did not answer just now — their roles are the ones from the last time they did. Try again in a minute.</div>`);
+  if (state.boards.checkFailed) body.push(`<div class="hint warn">⚠ the open-roles check did not run just now — the live scores are the board copies' word. Try again in a minute.</div>`);
+  const ck = state.boards.checkStats;
+  if (ck) body.push(`<div class="hint${ck.gone ? " warn" : ""}">${ck.gone ? "⚠ " : ""}Checked ${ck.n} ${ck.n === 1 ? "role" : "roles"} that claim to be open: ${ck.live || 0} ${ck.live === 1 ? "is" : "are"} still open, ${ck.gone || 0} ${ck.gone === 1 ? "is" : "are"} closed, ${ck.unknown || 0} we could not confirm.</div>`);
+  if (clusters.length && !off) {
+    const rows = clusters.map((c) => {
+      const srcs = c.items.map((m) => `<a href="${esc(m.url)}" target="_blank">${esc(m.name)}</a>`);
+      const src = c.items.length > 1
+        ? `<span class="multi">found on</span> ${srcs.join(" ")} <span class="multi">· listed in ${c.items.length} places</span>`
+        : srcs.join(" ");
+      const meta = [c.employer, c.location, c.posted ? "posted " + c.posted : ""].filter(Boolean).join(" · ");
+      // a posting we could not fetch is not a posting we know is closed
+      const liveCell = c.check === "gone" ? `<td class="num" title="the board says this job is no longer available"><span class="pill sc-lo">0.0</span></td>`
+        : c.check === "unknown" ? `<td class="num" title="no fetcher could read this posting, so we cannot say whether it is still open"><span class="pill sc-un">–</span></td>`
+        : c.check === "" && state.boards.checked === "asking" ? `<td class="num" title="checking whether this posting is still open"><span class="pill sc-un">${c.live != null ? c.live.toFixed(1) : "–"}</span></td>`
+        : cell(c.live, liveCls(c.live));
+      const gone = c.check === "gone" ? ` <span class="badge gone">no longer open</span>` : "";
+      return `<tr class="${c.loc != null && c.loc < 3 ? "dim" : ""}"><td><a href="${esc(c.items[0].url)}" target="_blank">${esc(c.title)}</a> <span class="badge">from a board copy</span>${gone}${meta ? `<div class="meta">${esc(meta)}</div>` : ""}${c.quote ? `<div class="quote">${esc(c.quote)}</div>` : ""}<div class="srcs">${src}</div></td>${cell(c.rel, scoreCls(c.rel))}${cell(c.job, scoreCls(c.job))}${cell(c.loc, locCls(c.loc))}${liveCell}</tr>`;
+    }).join("");
+    body.push(`<table class="matches-table"><thead><tr><th>posting</th><th class="num" data-tip="${REL_TIP}">rel</th><th class="num" data-tip="${JOB_TIP}">job</th><th class="num" data-tip="${LOC_TIP}">loc</th><th class="num" data-tip="${LIVE_TIP}">live</th></tr></thead><tbody>${rows}</tbody></table><div class="hint">The copy a job board shows can lag the employer's own page. Open the posting to confirm the role is still open.</div>`);
+  }
+  // the same bar as a platform row, so the section folds away like one
+  const roles = `${clusters.length} ${clusters.length === 1 ? "role" : "roles"}`;
+  const matchTxt = place ? `${matchN} match ${place}` : "—";
+  el.innerHTML = `<details class="prow boards" ${state.boardsOpen ? "open" : ""}>
+    <summary>
+      <span class="pname" data-tip="The other job boards we ask for every search: ${esc(list)}.">Other job boards</span>
+      <span class="counts ${busy ? "busy" : ""}">${off ? "off" : busy ? "…" : roles}</span>
+      <span class="counts ${busy ? "busy" : ""}">${off || busy ? "—" : matchTxt}</span>
+      <span class="links"><button class="btn-sm ${busy ? "btn-busy" : ""}" data-tip="Asks the other job boards for results this search missed. Free, and repeated searches are cached."${off ? ' disabled style="opacity:.55"' : ""}>${busy ? "looking…" : "look on other boards ↻"}</button></span>
+    </summary>
+    <div class="pbody">${body.join("")}</div>
+  </details>`;
+  el.querySelector("details")?.addEventListener("toggle", (e) => { state.boardsOpen = e.target.open; });
 }
 
 // ---- history ----
@@ -380,6 +661,7 @@ function renderBanner() {
   const miss = [];
   if (!state.cfg.brave) miss.push('counts disabled, add BRAVE_API_KEY to .env (see README)');
   if (!state.cfg.typesafe) miss.push('job filtering disabled, add TYPESAFE_API_KEY to .env');
+  if (!state.cfg.boards) miss.push('other boards disabled, add one of OLLAMA_API_KEY, BRIGHTDATA_SERP_API_KEY, BRAVE_API_KEY to .env');
   $("#banner").textContent = miss.length ? "⚠ " + miss.join(" · ") : "";
   $("#quotaHint").textContent = state.cfg.brave ? "Counts auto-fetch per platform (~1/sec), cached 24h, so repeat searches are free." : "";
 }
@@ -395,7 +677,15 @@ $("#rows").addEventListener("click", (e) => {
     e.preventDefault(); // keep the row collapsed while refreshing
     const r = state.rows.find((x) => x.query === e.target.dataset.q);
     if (r) fetchRow(r, true);
+  } else if (e.target.classList.contains("btn-sm")) {
+    e.preventDefault();
+    runBoards(true); // ask the other job boards again, fresh rather than cached
   }
+});
+$("#boards").addEventListener("click", (e) => {
+  if (!e.target.classList.contains("btn-sm")) return;
+  e.preventDefault();
+  runBoards(true); // ↻ re-asks, ignoring the 24h cache
 });
 $("#rows").addEventListener("toggle", (e) => { // toggle doesn't bubble — capture from the container
   const d = e.target.closest?.(".prow");
@@ -461,7 +751,9 @@ document.addEventListener("change", (e) => {
 
 // ---- init ----
 (async () => {
+  state.watchReady = fetch("/api/watch").then((r) => r.json()).catch(() => []);
   state.cfg = await fetch("/api/config").then((r) => r.json());
+  state.watch = await state.watchReady;
   const serverPlats = await fetch("/api/platforms").then((r) => r.json());
   const savedPlats = lsGet(PLAT_KEY, null);
   if (Array.isArray(savedPlats) && savedPlats.length) {
@@ -476,7 +768,7 @@ document.addEventListener("change", (e) => {
   }
   savePlatforms();
   $("#platCount").textContent = state.platforms.length;
-  renderBanner(); renderPlatforms(); renderHistory();
+  renderBanner(); renderPlatforms(); renderHistory(); renderBoardsNote(); renderBoards();
 })();
 </script>
 </body>

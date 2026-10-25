@@ -149,3 +149,171 @@ Matches ranked by relevance desc (2.7 → 1.1), noise dimmed, cached re-run inst
 
 ## README: worked input/output example inside the collapsible prerequisites block
 - Real shapes from server.mjs typesafeScores(): input = state (keywords, location, results title+snippet) + model jev-latest + per-result score questions with criteria anchors; output = answers map with plain scores; explained score -> criteria anchor -> UI color bucket; batched one call per platform noted.
+
+## Other job boards (designed, not built) — branch feat/other-job-boards
+- Trigger: a live Sydney QA role (Cove / Deck2 Capital, posted 2026-10-19) that the tool could not see. Two gates closed at once: Brave had not crawled the posting (`site:jobmesh.io "QA Engineer" Sydney` → 0, same query on another index → 8 with the job first), and every board copy of it answers a plain fetch with a Cloudflare 403.
+- Fix designed: a second search channel (`POST https://ollama.com/api/web_search`, Ollama Cloud key) that returns the posting page as text. Measured: not an LLM call — 3 calls moved /api/usage by 0 requests, $0, 0 tokens — and it bypasses the bot wall because the provider fetches the page.
+- Grilling, 4 rounds / 22 questions: fires only on empty platform rows; Brave-only when no key; automatic plus a "look on other boards" button per row; a 4-domain aggregator watch list (jobmesh, jobflurry, thebigjobsite, jobleads) queried only through the second channel, never as platform rows; the existing TypeSafe batch grades the board copies (no extra LLM calls); results live in their own "Other job boards" section; canonical dedup (title + location + employer) so one role counts once; board-copy rows keep their coloured loc/live but say where the words came from; config lives in `config.json` (keys stay in .env).
+- Copy (user-reviewed): "Other job boards" / "from a board copy" / "look on other boards" / "other boards: off — add an API key to include them", each with a plain hover explanation, no jargon.
+- Full record: plans/other-job-boards-plan.md. Mockup posted to the sideshow session (post bqQjc73KJtI, v2); rendering it exposed two defects now in the build plan: score cells must become pill spans (they render as tall lozenges on multi-line rows) and sidebar tooltips must open downwards (the upward rule covers the Search button).
+- Not in this change: public board APIs (greenhouse/lever/ashby/workday/smartrecruiters, all verified keyless), the free OpenRouter grader, the per-search accounting panel.
+- Mockup feedback (round 5): copy approved as written; two changes folded in — the boards are named on screen (one chip per board with its page count, plus "found on <board>" under each role) and every background step says so in words and pulses (sidebar line, row counts, row button, section sub-line, board chips). Mockup v5 verified in a browser: sidebar tooltip now opens downwards and stays inside the column; the on-state sidebar line reads "other boards: on — 4 boards asked" so it never contradicts the results below it.
+- Mockup feedback, second pass: the visible board chips were rejected — the user wants the board names in the tooltips instead. Mockup v7: no chips; the sidebar line, the section heading, the buttons and the in-flight messages all name jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com in their hover text. The only board names on screen are the links under a role, which open the posting. Per-board page counts are dropped: the section reports roles, not pages.
+
+## Other job boards — a second search channel (2026-10-23, branch feat/other-job-boards)
+
+**The problem it solves.** A live Sydney posting existed that the tool could
+not see: Quality Assurance Engineer at Cove (the software arm of Deck2
+Capital), posted 2026-10-19. Brave had not crawled it, and every copy of it on
+a job board answers a plain `fetch` with a Cloudflare 403. The employer
+published nothing the tool searches — 29 platform domains, zero hits for the
+company name, no careers page, no apply link.
+
+**The channel.** `POST https://ollama.com/api/web_search` — a search endpoint,
+not an LLM: no model, no prompt, no tokens, nothing on the balance. The
+provider fetches the page and hands the text back, so the bot wall never
+applies. `max_results` caps at 10 with no offset, so this channel cannot
+reproduce the "60+" page counts. ~2-5 s per call.
+
+**What was built**
+- `lib.mjs`: `DEFAULT_WATCH` (jobmesh.io, jobs-au.jobflurry.com,
+  au.thebigjobsite.com, www.jobleads.com), `loadWatch()` (config.json wins,
+  the four defaults are the fallback), `secondSearch()`, and the page-text
+  readers `boardMeta` / `boardTitle` / `boardFingerprint` / `boardQuote` /
+  `boardKey`. `node lib.mjs` still prints "lib self-check OK".
+- `server.mjs`: `/api/config` gains `ollama`, `/api/watch` returns the watch
+  list, `/api/second` runs one second-index search and returns each result
+  enriched with employer, location, posting date, a quote and a cluster key.
+- `index.html`: the "Other job boards" section under the platform rows; the
+  sidebar line in its on / asking now… / off states; the "look on other
+  boards" button on every row and on the section; the `?` marker on a row the
+  boards had nothing for; score cells as `span.pill` (the old markup turned
+  them into tall lozenges on any row with more than one line); and a
+  downwards tooltip variant so the sidebar note's explanation stays inside
+  the 340px column.
+
+**De-duplication — one role, one row.** Key = normalised title + normalised
+place + a fingerprint (the first 120 characters of the job description).
+Title and place alone merged four different Sydney "Quality Assurance
+Engineer" roles into one row; the fingerprint separates them, and two copies
+of one role on two boards share it. The employer (read from the page text
+when the board prints one) splits a cluster when two copies disagree.
+
+**Measured, acceptance search "quality assurance engineer" + Sydney** (live,
+real browser, 2026-10-23):
+- 34 roles in the section, 15 of them matching Sydney, 19 dimmed (loc < 3).
+- The Cove role is row 1: rel 4.0, job 3.9, loc 4.0, live 3.2 — one row, "Cove ·
+  Sydney, New South Wales · posted 19 Oct", "found on jobmesh.io jobflurry.com ·
+  listed in 2 places".
+- 24 of the 34 roles carry a title the Brave channel never returned at all (22 of the 24 distinct titles among them). Brave returned 102 distinct titles across the 29 platform domains.
+- All 34 board-copy rows carry a coloured loc and live.
+- 0 roles counted twice.
+- 4 new search calls per search (one per board) + 4 TypeSafe grading calls,
+  cached 24 h, so a repeat search costs 0 calls. 0 OpenRouter, 0 Ollama tokens.
+
+**The empty-row trigger is a safety net, not a main path.** Brave returns
+results for nearly every `site:` query (10 pages each, even for a nonsense
+phrase), so a platform row rarely comes back empty. It fires for a new or
+obscure platform Brave has not crawled yet; verified by driving the path
+directly — the row's counts fill from the second channel, and the `?` marker
+appears when there is nothing there.
+
+**Honest limits.** The copy a board shows can lag the employer's own page, and
+the row says so. The section reports roles, not pages, so the "60+" page count
+keeps its meaning. Two thirds of the board rows have no employer — jobflurry
+and thebigjobsite do not print one — so each row quotes the posting's own
+first words instead of guessing a field.
+
+## 2026-10-23 — fallback chain for the second search
+
+**The problem.** When Ollama Cloud rate-limits the second channel (HTTP 429,
+observed repeatedly), every board report ended in "did not answer just now"
+and the section went empty. The boards channel is a per-search default, so one
+dead provider silenced the whole feature.
+
+**The chain.** `secondSearch()` in `lib.mjs` now walks providers in order and
+returns on the first that answers: Ollama web search → Bright Data SERP API
+(`data_format: parsed_light` — Google's organic results) → the same
+`braveSearch()` the platform rows use. The Bright Data response wraps the SERP
+JSON inside `{ status_code, headers, body }` with `body` as an embedded JSON
+string; the wrapper is unwrapped before the organic rows are read. Each
+provider's rows are shaped to the same `{ title, url, content, …, key }`
+contract `boardMeta()` parses. A Brave fallback slices the paged result to the
+requested count so `count` stays truthful. With no provider key at all the
+error names what is missing.
+
+**Server-side env.** The `.env` parser now writes each value into
+`process.env`, so `lib.mjs` reads `BRIGHTDATA_SERP_API_KEY` and
+`BRIGHTDATA_SERP_ZONE` directly without a wider signature change.
+
+**Verified.** Live: Ollama 429 → Bright Data returned 10 organic jobmesh.io
+rows for `site:jobmesh.io "Test Automation Engineer" Sydney`; the browser flow
+("QA Engineer", Sydney NSW) renders the boards section from the fallback. The
+`/api/second` endpoint returns `{ error: … }` JSON on total failure, which the
+UI reports as the per-board "did not answer" warning. `node lib.mjs` self-check
+passes; the design detector is clean.
+
+## 2026-10-25 — the chain also steps past an empty answer
+
+**The gap.** The fallback chain treated "answered with 0 results" as a final
+answer, so an engine that was up but had not crawled a posting ended the
+search: Bright Data and Brave stayed unasked even though their indexes held
+the role. One weak index silenced the other two.
+
+**The change.** `secondSearch()` keeps a provider that errors and one that
+answers 0 in play the same way: the query moves to the next engine. When every
+configured engine has come back 0 — or errored — the chain returns the first
+empty result, because "all engines found nothing" is itself the truthful
+answer for the board to show. The board section's "?" row-marker and the
+genuine "0 roles" state keep their meanings.
+
+## 2026-10-25 — spot-check walk of the boards feature: five links, three verdicts
+
+**Committed.** The reader chain (plain GET → Ollama → Lightpanda → unknown)
+for the gone-check, the "taken offline" GONE phrase, the em dash for
+unreadable checks, the count-dash fix for the "undefined pages" bug, and the
+three-engine search fallback. Branch pushed; PR #1 open.
+
+**Verified live in ego-browser.** Search "qa engineer" + "Sydney, NSW":
+boards section reported "Checked 3 roles that claim to be open: 2 are still
+open, 1 is closed, 0 we could not confirm". Clicking through: the two
+"still open" jobleads rows open to real postings matching their quotes; the
+"no longer open" row's page shows the board's own "taken offline" banner.
+Zero unconfirmed rows — Lightpanda read past the jobleads wall.
+
+**Findings → plan briefs.** Three improvement briefs now live in `plans/`:
+`improvement-swipejobs.md` (site is US/UK-only today, its AU board is
+"coming soon" — hold off), `improvement-sydney-match-count.md` (platform
+rows show no location-match number; board rows do), and
+`improvement-platform-row-gone-checks.md` (stale platform links stay
+clickable; the expand-time verify pass should reuse the reader chain).
+
+## 2026-10-25 — the board round and the check gate on what they actually use
+
+**The gap.** `/api/second` and `/api/check` were gated on OLLAMA_API_KEY
+alone, while the engines behind them each gate on their own key (Bright
+Data, Brave) or none at all (plain GET in the check chain). A
+BrightData-only config got no boards and no checks.
+
+**The change.** `/api/second` runs when any engine has a key, and the
+Ollama tier joins only when its key exists; `/api/check` runs with no keys
+(it also loses a path where a `{disabled}` response made the UI print
+"Checked N roles" with zeros as if a check had run); `/api/config` gains a
+`boards` flag beside the documented `ollama` field; the UI boards gates
+follow the flag, and the off-note and banner name the three keys.
+
+**Verified.** Keyless sim (isolated ROOT on port 8788, own empty .env):
+config all-false, boards disabled, note names the keys. BrightData-only:
+7 rows through Bright Data, Ollama tier skipped without a request.
+Brave-only: boards flag true and 4 rows through Brave. The no-provider
+error is reachable. The behavior change on the documented `/api/check`
+gate is recorded here per the endpoint's contract note in the plan doc.
+
+**Two honesty notes.** A Brave-only config now runs the board round on
+every search — up to four `braveSearch` crawls (≈12 paged calls) extra
+per search, a real slice of the 2,000-per-month free tier; the escape
+hatch is a turn-boards-off switch reading `config.json`, whose plumbing
+(`loadWatch`) already exists. The keyless sim's isolation relied on the
+`.env` parser overwriting exported keys unconditionally — when the
+precedence fix lands, sim spawns must use `env -u KEY …` to stay
+isolated.
