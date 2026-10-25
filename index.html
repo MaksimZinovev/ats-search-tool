@@ -230,6 +230,7 @@ async function fetchRow(r, skipCache = false) {
   try {
     const res = await fetch(`/api/count?q=${encodeURIComponent(r.query)}`).then((x) => x.json());
     if (res.disabled) { r.status = "err"; r.err = "no Brave key"; renderRows(); return; }
+    if (res.error) { r.status = "err"; r.err = res.error; renderRows(); return; } // the count never came back
     r.count = res.count; r.capped = res.capped; r.matches = []; r.jobs = null;
     if (state.cfg.typesafe && res.results?.length) {
       const ai = await fetch("/api/ai", {
@@ -294,6 +295,7 @@ function pagesText(r) {
   if (r.status === "link") return "—";
   if (r.status === "dot" || r.second === "asking") return "…";
   if (r.status === "err") return esc(r.err || "error");
+  if (r.count == null) return "—"; // a count that never came back is not "undefined"
   const pW = r.capped || r.count !== 1 ? "pages" : "page";
   return `${r.capped ? `${r.count}+` : r.count} ${pW}`;
 }

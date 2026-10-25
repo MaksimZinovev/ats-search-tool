@@ -212,7 +212,11 @@ const server = createServer(async (req, res) => {
       return send(200, PLATFORMS);
     if (req.method === "GET" && u.pathname === "/api/count") {
       if (!BRAVE) return send(200, { disabled: true });
-      return send(200, await braveSearch(u.searchParams.get("q") || "", BRAVE));
+      try {
+        return send(200, await braveSearch(u.searchParams.get("q") || "", BRAVE));
+      } catch (e) {
+        return send(200, { error: String(e.message || e).slice(0, 80) }); // a rate hit reads as the error row, not "undefined pages"
+      }
     }
     if (req.method === "POST" && u.pathname === "/api/ai") {
       if (!TYPESAFE) return send(200, { disabled: true });
