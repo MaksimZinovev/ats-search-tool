@@ -7,3 +7,4 @@ node_modules/
 .atuin/
 .ckignore
 config.json
+/.impeccable
