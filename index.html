@@ -597,7 +597,7 @@ function renderBoards() {
       const meta = [c.employer, c.location, c.posted ? "posted " + c.posted : ""].filter(Boolean).join(" · ");
       // a posting we could not fetch is not a posting we know is closed
       const liveCell = c.check === "gone" ? `<td class="num" title="the board says this job is no longer available"><span class="pill sc-lo">0.0</span></td>`
-        : c.check === "unknown" ? `<td class="num" title="we could not fetch this posting, so we cannot confirm it is still open"><span class="pill sc-un">${c.live != null ? c.live.toFixed(1) : "–"}</span></td>`
+        : c.check === "unknown" ? `<td class="num" title="no fetcher could read this posting, so we cannot say whether it is still open"><span class="pill sc-un">–</span></td>`
         : c.check === "" && state.boards.checked === "asking" ? `<td class="num" title="checking whether this posting is still open"><span class="pill sc-un">${c.live != null ? c.live.toFixed(1) : "–"}</span></td>`
         : cell(c.live, liveCls(c.live));
       const gone = c.check === "gone" ? ` <span class="badge gone">no longer open</span>` : "";

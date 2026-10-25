@@ -14,12 +14,15 @@ if (existsSync(join(ROOT, ".env"))) {
   for (const line of readFileSync(join(ROOT, ".env"), "utf8").split("\n")) {
     if (line.trim().startsWith("#")) continue;
     const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m) env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+    if (m) {
+      env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+      process.env[m[1]] = env[m[1]]; // propagate to process.env for imported modules
+    }
   }
 }
-const BRAVE = process.env.BRAVE_API_KEY || env.BRAVE_API_KEY || "";
-const TYPESAFE = process.env.TYPESAFE_API_KEY || env.TYPESAFE_API_KEY || "";
-const OLLAMA = process.env.OLLAMA_API_KEY || env.OLLAMA_API_KEY || "";
+const BRAVE = process.env.BRAVE_API_KEY || "";
+const TYPESAFE = process.env.TYPESAFE_API_KEY || "";
+const OLLAMA = process.env.OLLAMA_API_KEY || "";
 
 const JOB_LEVELS = [
   "Clearly not a job posting: blog post, category or board index, company story, marketing or SEO page",

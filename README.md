@@ -95,6 +95,15 @@ A third key is optional too:
 - `OLLAMA_API_KEY` — powers the "Other job boards" section. Without it the
   tool works exactly as before, and the sidebar says the boards are off.
 
+A fourth key is optional too, and serves the same section:
+
+- `BRIGHTDATA_SERP_API_KEY` — when Ollama is rate-limited or down, the second
+  search falls back to Bright Data's SERP API, which serves Google's index
+  (roles Ollama and Brave have not crawled). `BRIGHTDATA_SERP_ZONE` holds the
+  zone name from your Bright Data dashboard (`serp_api1` by default). Without
+  it a rate-limited Ollama just means that board search reports "did not
+  answer" for the moment.
+
 The grading engine is **JEV**, a scoring model from TypeSafe. It is not a
 traditional LLM. It does not generate text, and it does not chat. You give it
 your question and a piece of content; it returns a graded score.
@@ -202,7 +211,12 @@ the platform rows:
   for 24 hours, so a repeated search asks nothing.
 
 The boards to ask are in `config.json` (gitignored) if you want to change them.
-The defaults live in `lib.mjs`.
+The defaults live in `lib.mjs`. The second search tries its providers in a
+fallback chain: Ollama first, then Bright Data's Google index (with
+`BRIGHTDATA_SERP_API_KEY`), then the same Brave channel the platform rows use.
+An engine that comes back empty is walked past the same way: the posting is
+asked of the next engine's index, and only when every configured engine has
+found nothing does the board say so.
 
 ## Features
 

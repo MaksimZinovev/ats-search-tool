@@ -223,3 +223,46 @@ the row says so. The section reports roles, not pages, so the "60+" page count
 keeps its meaning. Two thirds of the board rows have no employer — jobflurry
 and thebigjobsite do not print one — so each row quotes the posting's own
 first words instead of guessing a field.
+
+## 2026-10-23 — fallback chain for the second search
+
+**The problem.** When Ollama Cloud rate-limits the second channel (HTTP 429,
+observed repeatedly), every board report ended in "did not answer just now"
+and the section went empty. The boards channel is a per-search default, so one
+dead provider silenced the whole feature.
+
+**The chain.** `secondSearch()` in `lib.mjs` now walks providers in order and
+returns on the first that answers: Ollama web search → Bright Data SERP API
+(`data_format: parsed_light` — Google's organic results) → the same
+`braveSearch()` the platform rows use. The Bright Data response wraps the SERP
+JSON inside `{ status_code, headers, body }` with `body` as an embedded JSON
+string; the wrapper is unwrapped before the organic rows are read. Each
+provider's rows are shaped to the same `{ title, url, content, …, key }`
+contract `boardMeta()` parses. A Brave fallback slices the paged result to the
+requested count so `count` stays truthful. With no provider key at all the
+error names what is missing.
+
+**Server-side env.** The `.env` parser now writes each value into
+`process.env`, so `lib.mjs` reads `BRIGHTDATA_SERP_API_KEY` and
+`BRIGHTDATA_SERP_ZONE` directly without a wider signature change.
+
+**Verified.** Live: Ollama 429 → Bright Data returned 10 organic jobmesh.io
+rows for `site:jobmesh.io "Test Automation Engineer" Sydney`; the browser flow
+("QA Engineer", Sydney NSW) renders the boards section from the fallback. The
+`/api/second` endpoint returns `{ error: … }` JSON on total failure, which the
+UI reports as the per-board "did not answer" warning. `node lib.mjs` self-check
+passes; the design detector is clean.
+
+## 2026-10-25 — the chain also steps past an empty answer
+
+**The gap.** The fallback chain treated "answered with 0 results" as a final
+answer, so an engine that was up but had not crawled a posting ended the
+search: Bright Data and Brave stayed unasked even though their indexes held
+the role. One weak index silenced the other two.
+
+**The change.** `secondSearch()` keeps a provider that errors and one that
+answers 0 in play the same way: the query moves to the next engine. When every
+configured engine has come back 0 — or errored — the chain returns the first
+empty result, because "all engines found nothing" is itself the truthful
+answer for the board to show. The board section's "?" row-marker and the
+genuine "0 roles" state keep their meanings.

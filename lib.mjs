@@ -2,6 +2,8 @@
 // Self-check (no network): node lib.mjs
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import cp from "node:child_process";
+const { execFile, execFileSync } = cp; // both used plain; execFile wrapped in a promise above
 
 export const PLATFORMS = [
   ["ashby", "Ashby", "jobs.ashbyhq.com"],
@@ -131,7 +133,36 @@ export function boardKey(title, loc, fingerprint) { // one role, one row: title 
   return [norm(title), norm(String(loc || "").split(/[,/]/)[0]), norm(fingerprint)].join("|");
 }
 
+// ponytail: the boards keep working past one weak engine — Ollama first, then Bright Data's
+// Google index, then the Brave channel the rows already use; a 0-result answer is walked past too.
 export async function secondSearch(query, key, max = 10) {
+  // An engine that answers 0 is walked past, the same as a failed one: the next
+  // engine in the line may have crawled the posting this one has not. Only when
+  // every engine in .env has answered 0 (or errored) does the search come back
+  // empty — and then "all engines found nothing" is the truthful answer to show.
+  const zeros = [], errors = [];
+  const tries = [
+    () => ollamaSearch(query, key, max),
+    process.env.BRIGHTDATA_SERP_API_KEY ? () => brightDataSearch(query, process.env.BRIGHTDATA_SERP_API_KEY, max) : null,
+    // Brave names the field "description" and its paged count is pages, so map, slice and recount
+    process.env.BRAVE_API_KEY ? async () => {
+      const r = await braveSearch(query, process.env.BRAVE_API_KEY);
+      const results = mapBoardRows(r.results.slice(0, max).map((x) => ({ title: x.title, url: x.url, content: x.description })));
+      return { count: results.length, results };
+    } : null,
+  ].filter(Boolean);
+  for (const t of tries) {
+    try {
+      const r = await t();
+      if (r.results.length) return r;
+      zeros.push(r);
+    } catch (e) { errors.push(String(e.message || e)); }
+  }
+  if (zeros.length) return zeros[0];
+  throw new Error(errors.length ? errors[errors.length - 1] : "no search provider configured");
+}
+
+async function ollamaSearch(query, key, max = 10) {
   const r = await fetch("https://ollama.com/api/web_search", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -140,49 +171,146 @@ export async function secondSearch(query, key, max = 10) {
   });
   if (!r.ok) throw new Error(`second ${r.status}`);
   const j = await r.json();
-  const results = (j.results || []).map((x) => {
-    const meta = boardMeta(x.content, x.title);
-    const title = boardTitle(x.title, meta.location);
-    return { title, url: x.url || "", content: x.content || "", ...meta, quote: boardQuote(x.content), key: boardKey(title, meta.location, boardFingerprint(x.content)) };
+  return { count: (j.results || []).length, results: mapBoardRows(j.results || []) };
+}
+
+// Every provider's rows go through the same mapper, so whatever answered, the
+// boards read the same fields: parsed location/employer/date, a quote, a de-dup key.
+const mapBoardRows = (rows) => (rows || []).map((x) => {
+  const meta = boardMeta(x.content, x.title);
+  const title = boardTitle(x.title, meta.location);
+  return { title, url: x.url || "", content: x.content || "", ...meta, quote: boardQuote(x.content), key: boardKey(title, meta.location, boardFingerprint(x.content)) };
+});
+
+export async function brightDataSearch(query, key, max = 10) {
+  // Bright Data SERP API: one POST to /request carrying a Google search URL.
+  // key is the SERP API key; the zone name comes from BRIGHTDATA_SERP_ZONE (default "serp_api1").
+  // data_format "parsed_light" returns { organic: [{ title, link, description }] }, twice as fast as full JSON.
+  const zone = process.env.BRIGHTDATA_SERP_ZONE || "serp_api1";
+  const num = Math.min(Math.max(max, 1), 10);
+  const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=${num}&gl=au&hl=en`;
+  const r = await fetch("https://api.brightdata.com/request", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ zone, url: googleUrl, format: "json", data_format: "parsed_light" }),
+    signal: AbortSignal.timeout(30000),
   });
+  if (!r.ok) throw new Error(`brightdata ${r.status}`);
+  const j = await r.json();
+  // Response is { status_code, headers, body } where body is a JSON string
+  const data = typeof j.body === "string" ? JSON.parse(j.body) : j.body;
+  // Parsed Light JSON: { organic: [{ title, link, description, ... }, ...] }
+  const results = mapBoardRows((data.organic || []).map((x) => ({ title: x.title || "", url: x.link || "", content: x.description || "" })));
   return { count: results.length, results };
 }
 
 // The board's copy of a page in the search index can be older than the posting:
-// a job that closed last week still reads like a live one. So ask the provider
-// for the page itself, and say plainly what we could not confirm.
-const GONE = /no longer available|no longer open|no longer accepting|this (job|role|position) (is|has) (closed|expired|filled)|job (is )?no longer/i;
+// a job that closed last week still reads like a live one. So read the page
+// itself, and say plainly what we could and could not confirm.
+const GONE = /no longer available|no longer open|no longer accepting|taken offline|this (job|role|position) (is|has) (closed|expired|filled)|job (is )?no longer/i;
 const jobmeshApply = (url) => {
   const m = String(url).match(/^https?:\/\/jobmesh\.io\/job\/([0-9a-f-]+)/i);
   return m ? `https://jmmst.com/${m[1]}` : null; // the page the board's Apply button goes to
 };
 
-async function providerFetch(url, key) {
-  const r = await fetch("https://ollama.com/api/web_fetch", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!r.ok) return { ok: false, status: r.status };
-  const j = await r.json().catch(() => ({}));
-  return { ok: true, content: String(j.content || "") };
+// HTML to readable text: enough for the gone phrases and for the posting's own
+// fields to reach the grader, without depending on an extraction package.
+const stripHtml = (html) => String(html || "")
+  .replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, " ")
+  .replace(/<!--[\s\S]*?-->/g, " ")
+  .replace(/<[^>]+>/g, " ")
+  .replace(/&amp;/g, "&").replace(/&#x27;/g, "'").replace(/&quot;/g, "\"")
+  .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
+  .replace(/\s+/g, " ").trim().slice(0, 12000);
+
+// One page read past more than the Ollama fetcher: the free GET first (every
+// reader it satisfies protects the quota), Ollama second (the key is already in
+// .env, no process spawn), a locally installed lightpanda third (it renders like
+// a person, past bot walls, in about a second). The first tier that reads the
+// page wins; a bare 404 from a tier that really read the page is the verdict too.
+const FETCH_UAS = [
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (docpull/2.0)",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+];
+const WALL = /challenges\.cloudflare|just a moment|attention required|verify you are human/i;
+
+async function plainGet(url) {
+  for (const ua of FETCH_UAS) {
+    try {
+      const r = await fetch(url, { headers: { "User-Agent": ua, Accept: "text/html" }, redirect: "follow", signal: AbortSignal.timeout(15000) });
+      const body = await r.text();
+      if (WALL.test(body)) continue; // a challenge wears any status; it is not a verdict
+      if (r.ok) return { ok: true, content: stripHtml(body) };
+      if (r.status === 404 || r.status === 410) return { ok: false, status: r.status, final404: true }; // the origin says gone
+      continue; // 403/429/5xx and friends are blocked or transient, try the next reader
+    } catch { continue; }
+  }
+  return null;
 }
 
-// "live" = the page is there now. "gone" = the board says the job is no longer
-// available. "unknown" = we could not fetch it, which is not the same thing.
+async function ollamaFetch(url, key) {
+  if (!key) return null;
+  try {
+    const r = await fetch("https://ollama.com/api/web_fetch", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (r.ok) {
+      const j = await r.json().catch(() => ({}));
+      const content = String(j.content || "").trim();
+      return content.length > 40 ? { ok: true, content } : { ok: false, status: r.status };
+    }
+    if (r.status === 404 || r.status === 410) return { ok: false, status: r.status, final404: true };
+    return { ok: false, status: r.status };
+  } catch { return null; }
+}
+
+let lightpandaBin; // resolved once: the binary the user installed, or none
+const runLightpanda = (url) => new Promise((res) =>
+  execFile(lightpandaBin, ["fetch", "--dump", "markdown", "--log-level", "error", url],
+    { timeout: 25000, maxBuffer: 4e6 }, (err, stdout) => res(err || !stdout ? null : String(stdout))));
+async function lightpandaFetch(url) {
+  if (!lightpandaBin) return null;
+  const content = String(await runLightpanda(url) || "").replace(/^\$time=.*$/gm, "").trim();
+  return content ? { ok: true, content } : null;
+}
+
+// resolved once at startup: the renderer binary the user installed, or none
+try {
+  execFileSync("lightpanda", ["version"], { timeout: 5000, stdio: "ignore" });
+  lightpandaBin = "lightpanda";
+} catch { lightpandaBin = null; }
+
+// Returns { ok: true, content } when a reader got the page, { gone: true } when
+// the chain really reached the origin and it answered 404/410, or null. Reader
+// failures are not a verdict: they pass the torch to the next reader.
+async function providerFetch(url, key) {
+  let saw404 = false;
+  for (const t of [() => plainGet(url), () => ollamaFetch(url, key), () => lightpandaFetch(url)]) {
+    const r = await t();
+    if (!r) continue;
+    if (r.ok) return r;
+    if (r.status === 404) saw404 = true;
+  }
+  return saw404 ? { gone: true } : null;
+}
+
+// "live" = the page is there now. "gone" = the page says the job is closed, or
+// the last reader confirms it is not there. "unknown" = nothing could read it,
+// which is not the same thing as gone.
 export async function checkPostings(urls, key) {
   return Promise.all(urls.map(async (url) => {
     let state = "unknown";
     try {
       const r = await providerFetch(url, key);
-      if (r.ok) state = GONE.test(r.content) ? "gone" : "live";
-      else if (r.status === 404) {
+      if (r?.ok) state = GONE.test(r.content) ? "gone" : "live";
+      else if (r?.gone) {
+        // the origin really answered 404: one more chance through the apply link
         const alt = jobmeshApply(url);
-        if (alt) {
-          const r2 = await providerFetch(alt, key);
-          if (r2.ok) state = GONE.test(r2.content) ? "gone" : "live";
-        }
+        const r2 = alt ? await providerFetch(alt, key) : null;
+        state = r2?.ok && !GONE.test(r2.content) ? "live" : "gone";
       }
     } catch { state = "unknown"; }
     return { url, state };
@@ -257,5 +385,19 @@ if (process.argv[1]?.endsWith("lib.mjs")) {
   // a row with no employer still quotes the posting itself
   assert.equal(boardQuote("## Job Description\n\nWe are seeking an experienced Quality Assurance Engineer to help ensure the quality, reliability and release readiness of MST's platforms."), "We are seeking an experienced Quality Assurance Engineer to help ensure the quality…");
   assert.equal(boardQuote("## Job Description\n\nShort body."), "Short body.");
+  // the fallback tiers shape every provider's rows into the same contract
+  const bd = mapBoardRows([{ title: "QA Engineer In Sydney | TheBigJobsite.com", url: "https://au.thebigjobsite.com/j/9", content: "Full-time\n\nSydney / Global\n\n# QA Engineer\n\n## Job description\n\nbody text" }]);
+  assert.equal(bd[0].title, "QA Engineer");
+  assert.equal(bd[0].location, "Sydney");
+  assert.equal(bd[0].key, "qa engineer|sydney|body text"); // the snippet itself is the de-dup fingerprint when nothing else is readable
+  const br = mapBoardRows([{ title: "QA Engineer - Acme", url: "https://jobs.lever.co/acme/9", content: "Acme is hiring a QA Engineer in Sydney" }]);
+  assert.equal(br[0].url, "https://jobs.lever.co/acme/9");
+  assert.ok(br[0].key.startsWith("qa engineer acme|"), JSON.stringify(br[0].key));
+  // the gone-check phrases: an offline banner closes the posting, plain copy does not
+  assert.ok(GONE.test("Unfortunately, this job has recently been taken offline."));
+  assert.ok(GONE.test("We regret to inform you that this role is no longer available."));
+  assert.ok(!GONE.test("Senior QA Engineer working with modern CI/CD pipelines in Sydney."));
+  // the free GET reads HTML: the tags go, the words stay
+  assert.equal(stripHtml("<div>Led QA<br>team</div><script>tracking()</script><style>.x{}</style>"), "Led QA team");
   console.log("lib self-check OK");
 }
