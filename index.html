@@ -470,7 +470,7 @@ function clusterBoards(items) {
 // Ask the other boards for this search. They are asked on every search; each one lands as it arrives.
 async function runBoards(fresh = false) {
   const watch = state.watch.length ? state.watch : await (state.watchReady || Promise.resolve([])); // a search can start before the list is in
-  if (!state.cfg.ollama || !watch.length) { state.boards.items = []; state.boards.status = "off"; renderBoardsNote(); renderBoards(); return; }
+  if (!state.cfg.boards || !watch.length) { state.boards.items = []; state.boards.status = "off"; renderBoardsNote(); renderBoards(); return; }
   if (!state.k.trim()) return; // no keywords yet, so there is nothing to ask the boards for
   state.boards.asked = true;
   state.boards.status = "asking";
@@ -542,12 +542,12 @@ async function askRow(r) {
   } catch { r.second = "err"; }
   renderRows();
 }
-const askIfEmpty = (r) => { if (state.cfg.ollama && r.status === "done" && !r.count) askRow(r); };
+const askIfEmpty = (r) => { if (state.cfg.boards && r.status === "done" && !r.count) askRow(r); };
 
 // The marker on a row the other boards had nothing for.
 function skipMark(r) {
   if (r.status !== "done" || r.count || r.second === "asking") return "";
-  const tip = state.cfg.ollama
+  const tip = state.cfg.boards
     ? "We asked the other job boards for this one. Nothing there either, this role may not be published yet."
     : "We could not ask the other job boards for this one, no API key.";
   return `<span class="qmark" data-tip="${esc(tip)}">?</span>`;
@@ -558,9 +558,9 @@ function renderBoardsNote() {
   if (!el) return;
   const list = boardNames() || "the other job boards";
   let text, tip, mark = `<span class="qmark">?</span>`;
-  if (!state.cfg.ollama) {
+  if (!state.cfg.boards) {
     text = "other boards: off — add an API key to include them";
-    tip = `Without this, jobs posted in the last few days can be missing. Add an API key and we ask ${list} for the same search.`;
+    tip = `Without this, jobs posted in the last few days can be missing. Add one of OLLAMA_API_KEY, BRIGHTDATA_SERP_API_KEY or BRAVE_API_KEY to .env and we ask ${list} for the same search.`;
   } else if (state.boards.status === "asking") {
     text = "other boards: asking now…";
     tip = `Asking ${list} now.`;
@@ -578,7 +578,7 @@ function renderBoards() {
   if (!el) return;
   if (!state.boards.asked) { el.innerHTML = ""; return; } // nothing has been asked yet, so there is nothing to show
   const list = boardNames() || "the other job boards";
-  const off = !state.cfg.ollama;
+  const off = !state.cfg.boards;
   const busy = state.boards.status === "asking";
   const clusters = clusterBoards(state.boards.items.filter((m) => m.job == null || m.job >= 3));
   const matchN = clusters.filter((c) => (c.loc ?? -1) >= 3).length;
@@ -654,6 +654,7 @@ function renderBanner() {
   const miss = [];
   if (!state.cfg.brave) miss.push('counts disabled, add BRAVE_API_KEY to .env (see README)');
   if (!state.cfg.typesafe) miss.push('job filtering disabled, add TYPESAFE_API_KEY to .env');
+  if (!state.cfg.boards) miss.push('other boards disabled, add one of OLLAMA_API_KEY, BRIGHTDATA_SERP_API_KEY, BRAVE_API_KEY to .env');
   $("#banner").textContent = miss.length ? "⚠ " + miss.join(" · ") : "";
   $("#quotaHint").textContent = state.cfg.brave ? "Counts auto-fetch per platform (~1/sec), cached 24h, so repeat searches are free." : "";
 }

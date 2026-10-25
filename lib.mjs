@@ -143,7 +143,8 @@ export async function secondSearch(query, key, max = 10) {
   // empty — and then "all engines found nothing" is the truthful answer to show.
   const zeros = [], errors = [];
   const tries = [
-    () => ollamaSearch(query, key, max),
+    // each engine joins only when its key exists — the other two gate the same way below
+    key ? () => ollamaSearch(query, key, max) : null,
     process.env.BRIGHTDATA_SERP_API_KEY ? () => brightDataSearch(query, process.env.BRIGHTDATA_SERP_API_KEY, max) : null,
     // Brave names the field "description" and its paged count is pages, so map, slice and recount
     process.env.BRAVE_API_KEY ? async () => {

@@ -200,11 +200,13 @@ const server = createServer(async (req, res) => {
       return res.end(html);
     }
     if (req.method === "GET" && u.pathname === "/api/config")
-      return send(200, { brave: !!BRAVE, typesafe: !!TYPESAFE, ollama: !!OLLAMA });
+      // boards: can any search engine answer? each engine joins on its own key
+      return send(200, { brave: !!BRAVE, typesafe: !!TYPESAFE, ollama: !!OLLAMA, boards: !!(OLLAMA || process.env.BRIGHTDATA_SERP_API_KEY || BRAVE) });
     if (req.method === "GET" && u.pathname === "/api/watch")
       return send(200, loadWatch(join(ROOT, "config.json")));
     if (req.method === "GET" && u.pathname === "/api/second") {
-      if (!OLLAMA) return send(200, { disabled: true });
+      // the search runs when ANY engine has a key; secondSearch skips the ones that do not
+      if (!(OLLAMA || process.env.BRIGHTDATA_SERP_API_KEY || BRAVE)) return send(200, { disabled: true });
       try {
         return send(200, await secondSearch(u.searchParams.get("q") || "", OLLAMA, Number(u.searchParams.get("max")) || 10));
       } catch (e) {
@@ -236,8 +238,9 @@ const server = createServer(async (req, res) => {
       return send(200, { scores: await typesafeScores(body) });
     }
     if (req.method === "POST" && u.pathname === "/api/check") {
-      // is this board posting still there? the copy in the search index can be old
-      if (!OLLAMA) return send(200, { disabled: true });
+      // is this board posting still there? the copy in the search index can be old.
+      // runs with no keys at all: plain GET needs none, ollamaFetch skips itself,
+      // and an all-unreadable answer is the honest "unknown"
       if (!/application\/json/.test(req.headers["content-type"] || "")) return send(400, { error: "send application/json" }); // browser pages cannot send this header: no cross-origin body posts
       const chunks = [];
       let n = 0;
