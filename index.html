@@ -476,6 +476,7 @@ async function runBoards(fresh = false) {
   state.boards.status = "asking";
   state.boards.checked = "";
   state.boards.checkStats = null;
+  state.boards.checkFailed = false;
   state.boards.failed = 0;
   const prev = new Map(); // a board that does not answer keeps the roles it gave us last time
   for (const it of state.boards.items) { if (!prev.has(it.domain)) prev.set(it.domain, []); prev.get(it.domain).push(it); }
@@ -508,6 +509,7 @@ async function checkBoardRows() {
   const byUrl = new Map(state.boards.items.map((i) => [i.url, i]));
   const urls = rows.map((c) => c.items[0].url);
   state.boards.checked = "asking";
+  state.boards.checkFailed = false; // a rerun of the ask starts without the old failure claim
   renderBoards();
   try {
     const res = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ urls }) }).then((r) => r.json());
@@ -520,7 +522,11 @@ async function checkBoardRows() {
       stats[s.state] = (stats[s.state] || 0) + 1;
     }
     state.boards.checkStats = { n: urls.length, ...stats };
-  } catch { /* nothing confirmed, nothing claimed */ }
+  } catch {
+    // the check itself failed (server hiccup, network): say so — the row
+    // scores below stay board-copy evidence, not verified verdicts
+    state.boards.checkFailed = true;
+  }
   state.boards.checked = "done";
   renderBoards(); renderRows();
 }
@@ -588,6 +594,7 @@ function renderBoards() {
   if (off) body.push(`<div class="hint">These boards are off. Add an API key and this search will ask them too, that is where jobs posted in the last few days usually show up first.</div>`);
   if (busy) body.push(`<div class="hint busy">asking ${esc(list)} now… matching each role to the jobs you searched for, results appear here as they arrive.</div>`);
   if (state.boards.failed) body.push(`<div class="hint warn">⚠ ${state.boards.failed} of the ${state.watch.length} boards did not answer just now — their roles are the ones from the last time they did. Try again in a minute.</div>`);
+  if (state.boards.checkFailed) body.push(`<div class="hint warn">⚠ the open-roles check did not run just now — the live scores are the board copies' word. Try again in a minute.</div>`);
   const ck = state.boards.checkStats;
   if (ck) body.push(`<div class="hint${ck.gone ? " warn" : ""}">${ck.gone ? "⚠ " : ""}Checked ${ck.n} ${ck.n === 1 ? "role" : "roles"} that claim to be open: ${ck.live || 0} ${ck.live === 1 ? "is" : "are"} still open, ${ck.gone || 0} ${ck.gone === 1 ? "is" : "are"} closed, ${ck.unknown || 0} we could not confirm.</div>`);
   if (clusters.length && !off) {
