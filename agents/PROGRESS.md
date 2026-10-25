@@ -266,3 +266,24 @@ configured engine has come back 0 — or errored — the chain returns the first
 empty result, because "all engines found nothing" is itself the truthful
 answer for the board to show. The board section's "?" row-marker and the
 genuine "0 roles" state keep their meanings.
+
+## 2026-10-25 — spot-check walk of the boards feature: five links, three verdicts
+
+**Committed.** The reader chain (plain GET → Ollama → Lightpanda → unknown)
+for the gone-check, the "taken offline" GONE phrase, the em dash for
+unreadable checks, the count-dash fix for the "undefined pages" bug, and the
+three-engine search fallback. Branch pushed; PR #1 open.
+
+**Verified live in ego-browser.** Search "qa engineer" + "Sydney, NSW":
+boards section reported "Checked 3 roles that claim to be open: 2 are still
+open, 1 is closed, 0 we could not confirm". Clicking through: the two
+"still open" jobleads rows open to real postings matching their quotes; the
+"no longer open" row's page shows the board's own "taken offline" banner.
+Zero unconfirmed rows — Lightpanda read past the jobleads wall.
+
+**Findings → plan briefs.** Three improvement briefs now live in `plans/`:
+`improvement-swipejobs.md` (site is US/UK-only today, its AU board is
+"coming soon" — hold off), `improvement-sydney-match-count.md` (platform
+rows show no location-match number; board rows do), and
+`improvement-platform-row-gone-checks.md` (stale platform links stay
+clickable; the expand-time verify pass should reuse the reader chain).
