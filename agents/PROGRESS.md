@@ -287,3 +287,33 @@ Zero unconfirmed rows — Lightpanda read past the jobleads wall.
 rows show no location-match number; board rows do), and
 `improvement-platform-row-gone-checks.md` (stale platform links stay
 clickable; the expand-time verify pass should reuse the reader chain).
+
+## 2026-10-25 — the board round and the check gate on what they actually use
+
+**The gap.** `/api/second` and `/api/check` were gated on OLLAMA_API_KEY
+alone, while the engines behind them each gate on their own key (Bright
+Data, Brave) or none at all (plain GET in the check chain). A
+BrightData-only config got no boards and no checks.
+
+**The change.** `/api/second` runs when any engine has a key, and the
+Ollama tier joins only when its key exists; `/api/check` runs with no keys
+(it also loses a path where a `{disabled}` response made the UI print
+"Checked N roles" with zeros as if a check had run); `/api/config` gains a
+`boards` flag beside the documented `ollama` field; the UI boards gates
+follow the flag, and the off-note and banner name the three keys.
+
+**Verified.** Keyless sim (isolated ROOT on port 8788, own empty .env):
+config all-false, boards disabled, note names the keys. BrightData-only:
+7 rows through Bright Data, Ollama tier skipped without a request.
+Brave-only: boards flag true and 4 rows through Brave. The no-provider
+error is reachable. The behavior change on the documented `/api/check`
+gate is recorded here per the endpoint's contract note in the plan doc.
+
+**Two honesty notes.** A Brave-only config now runs the board round on
+every search — up to four `braveSearch` crawls (≈12 paged calls) extra
+per search, a real slice of the 2,000-per-month free tier; the escape
+hatch is a turn-boards-off switch reading `config.json`, whose plumbing
+(`loadWatch`) already exists. The keyless sim's isolation relied on the
+`.env` parser overwriting exported keys unconditionally — when the
+precedence fix lands, sim spawns must use `env -u KEY …` to stay
+isolated.
