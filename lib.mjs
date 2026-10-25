@@ -262,6 +262,7 @@ async function ollamaFetch(url, key) {
     if (r.ok) {
       const j = await r.json().catch(() => ({}));
       const content = String(j.content || "").trim();
+      if (WALL.test(content)) return null; // a bot challenge wears any status; the next reader takes over
       return content.length > 40 ? { ok: true, content } : { ok: false, status: r.status };
     }
     if (r.status === 404 || r.status === 410) return { ok: false, status: r.status, final404: true };
@@ -276,6 +277,7 @@ const runLightpanda = (url) => new Promise((res) =>
 async function lightpandaFetch(url) {
   if (!lightpandaBin) return null;
   const content = String(await runLightpanda(url) || "").replace(/^\$time=.*$/gm, "").trim();
+  if (WALL.test(content)) return null; // the same rule: a challenge renders to text; it is no answer
   return content ? { ok: true, content } : null;
 }
 
@@ -435,6 +437,13 @@ if (process.argv[1]?.endsWith("lib.mjs")) {
   // the SSRF guard: private network space never reaches a reader tier
   assert.equal(await publicUrl("file:///etc/passwd"), null); // the scheme half needs no DNS
   assert.equal(await publicUrl("ftp://host/page"), null);
+  // the challenge rule: a wall page is text-rich enough to pass the 40-char gate,
+  // so both reading tiers test for it before accepting content
+  const challenge = "Verifying you are human. Enable JavaScript and cookies to continue. Just a moment…";
+  assert.ok(challenge.length > 40 && WALL.test(challenge));
+  // the known boundary: a legit posting whose copy names verify-you-are-human also matches,
+  // so both text tiers refuse it and the chain degrades honestly to lightpanda or unknown
+  assert.ok(WALL.test("You will build automated tests that verify you are human."));
   assert.ok(["127.0.0.1", "169.254.169.254", "0.0.0.0", "10.1.2.3", "172.20.1.1", "192.168.1.1",
     "100.100.1.1", "::1", "fd12::1", "fe80::1", "::ffff:127.0.0.1"].every((ip) => isPrivateIp(ip)));
   assert.ok(["1.2.3.4", "8.8.8.8", "2606:4700::1111"].every((ip) => !isPrivateIp(ip)));
