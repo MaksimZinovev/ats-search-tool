@@ -102,7 +102,12 @@ export function boardMeta(content, rawTitle = "") {
     const next = t.slice(head.index + head[0].length).split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
     if (next && !/^[#\-*•]/.test(next) && !next.includes(":") && !next.includes(",") && next.length <= 60) employer = next;
   }
-  return { location: loc.trim(), employer, posted: d.length ? `${+d[1]} ${MONTHS[+d[0] - 1]}` : "" };
+  // jobmesh prints M/D/YYYY; an AU board can print D/M/YYYY — a first component
+  // above 12 cannot be a month, so flip the parse. No real date has both
+  // components above 12; a garbage string like "19/19/2026" would render
+  // undefined again — the data, never the code, is what keeps it safe.
+  const posted = d.length ? (+d[0] > 12 ? `${+d[0]} ${MONTHS[+d[1] - 1]}` : `${+d[1]} ${MONTHS[+d[0] - 1]}`) : "";
+  return { location: loc.trim(), employer, posted };
 }
 export function boardTitle(raw, loc) {
   let t = String(raw || "").split(" | ")[0].trim(); // boards append their own name
@@ -411,6 +416,9 @@ if (process.argv[1]?.endsWith("lib.mjs")) {
   assert.equal(meta.location, "Sydney, New South Wales");
   assert.equal(meta.employer, "Cove");
   assert.equal(meta.posted, "19 Oct");
+  // a day-first board reads as a date instead of "posted 10 undefined"
+  assert.equal(boardMeta("Online since\n19/10/2026\n\nSydney", "").posted, "19 Oct"); // the flip branch
+  assert.equal(boardMeta("Online since\n25/12/2026\n\nSydney", "").posted, "25 Dec"); // AU Christmas; an M/D board's 12/25/2026 renders identically
   assert.equal(boardTitle("Quality Assurance Engineer In Sydney | TheBigJobsite.com", "Sydney / Global"), "Quality Assurance Engineer");
   // a board prints "place / work type": only the place is the place
   assert.equal(boardMeta("Quality Assurance Engineer In Sydney | TheBigJobsite.com\n\nSydney / Global\n\n## Job Description\n\nbody").location, "Sydney");
