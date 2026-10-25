@@ -32,28 +32,28 @@ row into a ranked match list.
 
 ```mermaid
 flowchart TD
-    U["You type a role<br/>and an optional city"] --> P
+    U["You search: qa engineer · Sydney"] --> P
     U --> B
 
-    subgraph S1["the platforms — 29 employer boards, swept at once"]
-        P["one scoped search per platform"] --> A["an AI reads each snippet:<br/>an open role that fits your words?"]
-        A --> R["platform rows: pages · jobs,<br/>every match graded 0–4"]
+    subgraph S1["the platforms — Greenhouse, Lever, Workday and 26 more"]
+        P["each platform gets one scoped search:<br/>site:boards.greenhouse.io 'qa engineer' Sydney"] --> A["the AI reads every snippet:<br/>an open QA Engineer role in Sydney?"]
+        A --> R["Greenhouse lands as 13 pages · 11 jobs;<br/>lever.co as 40+ · 31 — each match graded 0–4"]
     end
 
-    subgraph S2["other job boards — boards that mirror the postings"]
-        B["four mirror boards are asked<br/>through three search engines,<br/>in turn: Ollama → Bright Data → Brave"] --> M["the first engine holding roles wins;<br/>one role = one row, quoting the<br/>board's own copy: employer · posted · snippet"]
+    subgraph S2["other job boards — jobleads.com, jobmesh.io and two more"]
+        B["the same search asked through three engines,<br/>in turn: Ollama → Bright Data → Brave"] --> M["the first engine with roles wins:<br/>one role = one row, quoting the copy —<br/>'ASX Group is seeking a Lead QA Engineer…'"]
     end
 
-    R -. "expand a row: the real posting<br/>pages are re-read and re-graded" .-> C
-    M -. "a copy can lag the employer's own page;<br/>the check is what ages it honestly" .-> C
-    C["the honesty pass: roles claiming to<br/>be open are checked against the<br/>employer's real page"] --> C1{"who managed to read the page?"}
+    R -. "expand Greenhouse: the real posting pages<br/>get re-read and re-graded" .-> C
+    M -. "that copy can be days old —<br/>the check asks the employer's real page" .-> C
+    C["board copies age — roles that claim<br/>to be open get checked against<br/>the employer's real page"] --> C1{"who managed to read the page?"}
     C1 -->|"1 — a free plain GET"| O
     C1 -->|"2 — Ollama's fetch"| O
     C1 -->|"3 — a local Lightpanda render<br/>(optional one-line install)"| O
-    O{"what the real page says"} -->|"still open"| O1["keeps its live score"]
-    O -->|"gone / taken offline"| O2["flagged 'no longer open';<br/>live drops to 0"]
-    O -->|"nobody could read it —<br/>a bot wall is 'no answer' too"| O3["– could not confirm;<br/>no stale numbers"]
-    R --> CACHE["every answer is cached for 24 hours —<br/>a repeated search asks nothing again"]
+    O{"what the page says"} -->|"still open"| O1["Transport for NSW · Hybrid QA Test Engineer<br/>keeps its live score"]
+    O -->|"'…this job has recently been<br/>taken offline.'"| O2["that row flags 'no longer open'<br/>and its live score drops to 0"]
+    O -->|"a bot wall nobody could read"| O3["– could not confirm;<br/>no stale numbers"]
+    R --> CACHE["everything is cached for 24 hours —<br/>the same search tomorrow asks nothing"]
     M --> CACHE
 ```
 
