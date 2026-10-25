@@ -87,13 +87,16 @@ Two passes, both fed by Brave results and the posting pages themselves:
 
 Two keys in `.env` (copy `.env.example`):
 
-- `BRAVE_API_KEY` — powers the counts. Free tier: 2,000 queries/month.
+- `BRAVE_API_KEY` — powers the counts (free tier: 2,000 queries/month) and
+  the boards chain's last engine.
 - `TYPESAFE_API_KEY` — powers the AI grading. Optional: without it you still get all platform links and raw page counts.
 
 A third key is optional too:
 
-- `OLLAMA_API_KEY` — powers the "Other job boards" section. Without it the
-  tool works exactly as before, and the sidebar says the boards are off.
+- `OLLAMA_API_KEY` — powers the boards search's first engine and the Ollama
+  fetch tier of the open-roles check. Any one of the three search keys turns
+  the boards on; a config with none of them leaves the boards off, and the
+  section's note names the keys that work.
 
 A fourth key is optional too, and serves the same section:
 
@@ -168,7 +171,9 @@ parallel.
 ```text
 ats-search-tool/
 ├── server.mjs            # zero-dependency HTTP server: APIs, verify pass, page text
-├── lib.mjs               # query building + paged Brave counting
+├── lib.mjs               # query building, paged Brave counting, the second
+│                           search's engine chain, board-row parsing, the reader
+│                           chain behind the gone-checks
 ├── index.html            # the whole UI (single file)
 ├── .env.example          # keys template
 ├── DESIGN.md             # design system (Ollama-derived monochrome)
@@ -194,10 +199,11 @@ Some postings are newer than the search engine. A role posted four days ago on
 a job board can sit there for a week before any index crawls it, and a plain
 fetch of that page is usually refused by the board's bot protection.
 
-With `OLLAMA_API_KEY` in `.env`, every search also asks four job boards —
-jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com — through a
-second search index. The results land in an "Other job boards" section below
-the platform rows:
+With any one of the three search keys in `.env` (`OLLAMA_API_KEY`,
+`BRIGHTDATA_SERP_API_KEY` or `BRAVE_API_KEY`), every search also asks four
+job boards — jobmesh.io, jobflurry.com, thebigjobsite.com and jobleads.com —
+through a second search index. The results land in an "Other job boards"
+section below the platform rows:
 
 - The page text comes back with the results, so a posting behind a bot wall is
   readable and its location and posting date can be scored.
@@ -207,8 +213,11 @@ the platform rows:
   which boards it was found on.
 - A row that is a board's copy of a posting is marked "from a board copy", and
   a board's copy can lag the employer's own page — open the posting to check.
-- It costs nothing per search: no tokens, no model, and the results are cached
-  for 24 hours, so a repeated search asks nothing.
+- The board round runs on the quota you give it: Ollama on your monthly
+  Ollama Cloud quota, Bright Data per request, and a Brave-only config spends
+  boards from its Brave account (a board search is a paged crawl — up to ~12
+  Brave calls per search). The results are cached for 24 hours, so a repeated
+  search asks nothing again.
 
 The boards to ask are in `config.json` (gitignored) if you want to change them.
 The defaults live in `lib.mjs`. The second search tries its providers in a
@@ -217,6 +226,36 @@ fallback chain: Ollama first, then Bright Data's Google index (with
 An engine that comes back empty is walked past the same way: the posting is
 asked of the next engine's index, and only when every configured engine has
 found nothing does the board say so.
+
+### Is the posting actually still open?
+
+Board copies age. Roles that claim to be open are therefore checked against
+the real posting page in the background (about six per search, the strongest
+claims first). The section then reports, for example: "Checked 3 roles that
+claim to be open: 2 are still open, 1 is closed, 0 we could not confirm."
+
+- A page that states the role is gone ("no longer available", "taken
+  offline"), or a real 404, flags the row **no longer open** and its live
+  score drops to 0.
+- A page no reader could fetch shows an em dash **–** in the live column:
+  we are honest that we could not confirm it, rather than repeat a possibly
+  stale board copy.
+- The readers are tried in order: a free plain GET, then Ollama's fetch, then
+  a local render with **Lightpanda** — a small headless browser that reads
+  pages the scripted GETs cannot (bot walls). Lightpanda is optional; one
+  line installs it and a wall page stops being a dash and starts being a
+  verdict:
+
+    `brew install lightpanda-io/browser/lightpanda-nightly`
+
+  Without it every check still runs — plain GET answers many pages — but
+  walled postings stay dash-marked instead of verified.
+
+### Reading the row marks
+
+- **muted score** — judged from the search snippet only (weak evidence)
+- **✕** — that page refused the fetch (bot check); the reason is in the tooltip
+- **–** — checked but the posting page could not be read, so no live verdict
 
 ## Features
 
