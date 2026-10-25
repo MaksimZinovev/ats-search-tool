@@ -2,6 +2,7 @@
 // Self-check (no network): node lib.mjs
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { lookup } from "node:dns/promises";
 import cp from "node:child_process";
 const { execFile, execFileSync } = cp; // both used plain; execFile wrapped in a promise above
 
@@ -283,10 +284,47 @@ try {
   lightpandaBin = "lightpanda";
 } catch { lightpandaBin = null; }
 
+// ---- SSRF guard: the reader chain fetches only vetted public web pages ----
+
+// True for loopback, link-local (169.254/16, fe80::/10), private (10/8,
+// 172.16/12, 192.168/16, fc00::/7), CGNAT (100.64/10), unspecified, multicast
+// and reserved addresses — anything the private side of the network could own.
+export function isPrivateIp(ip) {
+  const v4 = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) { const a = +v4[1], b = +v4[2];
+    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127)
+      || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && b === 168) || a >= 224;
+  }
+  const mapped = ip.toLowerCase().match(/^::ffff:(?:0:)?((?:\d{1,3}\.){3}\d{1,3})$/);
+  if (mapped) return isPrivateIp(mapped[1]);
+  const h = /^[0-9a-f:]+$/i.test(ip) ? parseInt((ip.split(":")[0] || "0"), 16) : NaN;
+  return isNaN(h) || (h & 0xff00) === 0   // ::/8: every first hextet 0x00xx — unspecified, ::1, even NAT64-embedded v4
+    || (h & 0xfe00) === 0xfc00            // fc00::/7: unique-local
+    || (h & 0xffc0) === 0xfe80            // fe80::/10: link-local
+    || (h & 0xff00) === 0xff00;           // ff00::/8: multicast
+}
+
+// Returns the URL when it is an http(s) address that resolves to public
+// network space only, else null. Unresolvable hosts count as private.
+// ponytail: the tier's own resolve (and the redirect hops fetch, Ollama and
+// lightpanda follow internally) can still rebind between vetting and fetch;
+// IPv4-in-IPv6 embeds like 6to4 (2002::/16) also go unclassified. All accepted
+// for a single-user local tool. Full fix: pin resolved IPs per hop.
+export async function publicUrl(url) {
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  let addrs;
+  try { addrs = await lookup(u.hostname, { all: true }); } catch { return null; }
+  return addrs.every((a) => !isPrivateIp(a.address)) ? url : null;
+}
+
 // Returns { ok: true, content } when a reader got the page, { gone: true } when
 // the chain really reached the origin and it answered 404/410, or null. Reader
 // failures are not a verdict: they pass the torch to the next reader.
 async function providerFetch(url, key) {
+  if (!(await publicUrl(url))) return null; // a page we cannot vet stays unknown
   let saw404 = false;
   for (const t of [() => plainGet(url), () => ollamaFetch(url, key), () => lightpandaFetch(url)]) {
     const r = await t();
@@ -393,6 +431,12 @@ if (process.argv[1]?.endsWith("lib.mjs")) {
   const br = mapBoardRows([{ title: "QA Engineer - Acme", url: "https://jobs.lever.co/acme/9", content: "Acme is hiring a QA Engineer in Sydney" }]);
   assert.equal(br[0].url, "https://jobs.lever.co/acme/9");
   assert.ok(br[0].key.startsWith("qa engineer acme|"), JSON.stringify(br[0].key));
+  // the SSRF guard: private network space never reaches a reader tier
+  assert.equal(await publicUrl("file:///etc/passwd"), null); // the scheme half needs no DNS
+  assert.equal(await publicUrl("ftp://host/page"), null);
+  assert.ok(["127.0.0.1", "169.254.169.254", "0.0.0.0", "10.1.2.3", "172.20.1.1", "192.168.1.1",
+    "100.100.1.1", "::1", "fd12::1", "fe80::1", "::ffff:127.0.0.1"].every((ip) => isPrivateIp(ip)));
+  assert.ok(["1.2.3.4", "8.8.8.8", "2606:4700::1111"].every((ip) => !isPrivateIp(ip)));
   // the gone-check phrases: an offline banner closes the posting, plain copy does not
   assert.ok(GONE.test("Unfortunately, this job has recently been taken offline."));
   assert.ok(GONE.test("We regret to inform you that this role is no longer available."));
