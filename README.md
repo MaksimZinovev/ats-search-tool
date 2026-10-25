@@ -28,6 +28,35 @@ Applicant Tracking System (ATS): Greenhouse, Lever, Workday, government boards.
 This tool runs one Brave `site:` search per platform, then expands any platform
 row into a ranked match list.
 
+### The whole flow on one picture
+
+```mermaid
+flowchart TD
+    U["You type a role<br/>and an optional city"] --> P
+    U --> B
+
+    subgraph S1["the platforms — 29 employer boards, swept at once"]
+        P["one scoped search per platform"] --> A["an AI reads each snippet:<br/>an open role that fits your words?"]
+        A --> R["platform rows: pages · jobs,<br/>every match graded 0–4"]
+    end
+
+    subgraph S2["other job boards — boards that mirror the postings"]
+        B["four mirror boards are asked<br/>through three search engines,<br/>in turn: Ollama → Bright Data → Brave"] --> M["the first engine holding roles wins;<br/>one role = one row, quoting the<br/>board's own copy: employer · posted · snippet"]
+    end
+
+    R -. "expand a row: the real posting<br/>pages are re-read and re-graded" .-> C
+    M -. "a copy can lag the employer's own page;<br/>the check is what ages it honestly" .-> C
+    C["the honesty pass: roles claiming to<br/>be open are checked against the<br/>employer's real page"] --> C1{"who managed to read the page?"}
+    C1 -->|"1 — a free plain GET"| O
+    C1 -->|"2 — Ollama's fetch"| O
+    C1 -->|"3 — a local Lightpanda render<br/>(optional one-line install)"| O
+    O{"what the real page says"} -->|"still open"| O1["keeps its live score"]
+    O -->|"gone / taken offline"| O2["flagged 'no longer open';<br/>live drops to 0"]
+    O -->|"nobody could read it —<br/>a bot wall is 'no answer' too"| O3["– could not confirm;<br/>no stale numbers"]
+    R --> CACHE["every answer is cached for 24 hours —<br/>a repeated search asks nothing again"]
+    M --> CACHE
+```
+
 Each platform row shows:
 
 | Column | Meaning |
